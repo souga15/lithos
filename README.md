@@ -105,6 +105,61 @@ graph TD
 
 ---
 
+## 📁 Repository & File Structure
+
+Detailed developer guides are available in the [`docs/`](docs/) directory:
+* 🛠️ [**Backend Developer Guide (`docs/BACKEND_DEVELOPER_GUIDE.md`)**](docs/BACKEND_DEVELOPER_GUIDE.md)
+* 🎨 [**Frontend Developer Guide (`docs/FRONTEND_DEVELOPER_GUIDE.md`)**](docs/FRONTEND_DEVELOPER_GUIDE.md)
+
+```
+LITHOS/
+├── README.md                           # Main project documentation & quickstart
+├── CONTRIBUTING.md                     # Contribution standards & workflow
+├── LICENSE                             # MIT Open Source License
+├── .gitignore                          # Protected exclusions (no .env, no large datasets)
+│
+├── docs/                               # Detailed technical guides & scientific reports
+│   ├── BACKEND_DEVELOPER_GUIDE.md      # FastAPI backend architecture, APIs & ML pipelines
+│   ├── FRONTEND_DEVELOPER_GUIDE.md     # React, Vite & Cesium 3D WebGIS guide
+│   ├── LITHOS_Phase11_Project_Report.md# Complete 9-section mathematical & geotechnical report
+│   ├── DATA_DOWNLOADS.md               # Guide to access 1.7GB GeoPackage & full CSVs
+│   └── assets/                         # Figures & publication evaluation graphics
+│
+├── phase7-webapp/                      # Production Full-Stack Application
+│   ├── backend/                        # High-Performance FastAPI Engine
+│   │   ├── main.py                     # Primary API routes, REST endpoints & WebSockets
+│   │   ├── run_backend.py              # Uvicorn server launcher
+│   │   ├── requirements.txt            # Python dependencies (FastAPI, PyTorch, GeoPandas)
+│   │   ├── .env.example                # Safe environment variable template
+│   │   ├── pinn_model.py               # PyTorch PINN network architecture
+│   │   ├── pinn_model_v2.pth           # Trained PyTorch weights (79,169 params)
+│   │   ├── routing_engine.py           # A* routing with geomechanical risk cost penalties
+│   │   ├── deformation_service.py      # InSAR ground deformation tracking
+│   │   ├── weather_service.py          # Real-time precipitation & IMD monitoring
+│   │   └── data/                       # Regional GeoJSON boundaries & terrain matrices
+│   │
+│   └── frontend/                       # Interactive React + Vite WebGIS Application
+│       ├── index.html                  # HTML5 entrypoint
+│       ├── package.json                # Frontend dependencies (React, CesiumJS, Leaflet)
+│       ├── vite.config.js              # Vite bundler & Cesium asset configuration
+│       ├── tailwind.config.js          # Design system tokens (space palette, risk colors)
+│       └── src/
+│           ├── apiConfig.js            # Axios client & WebSocket endpoint resolver
+│           ├── index.css               # Core CSS & glassmorphic utilities
+│           ├── pages/                  # Route views (Home, HeatmapView, SafeRoute, Forecast)
+│           └── components/             # Reusable UI widgets (CesiumTerrain3D, Terrain3DHeatmap)
+│
+└── colab files/                        # Google Colab Research & Model Training
+    └── SIH_NEW_INTRIGATION/r2/final r2/
+        ├── LITHOS_Phase11_FIXED_Fast_Dense.ipynb # Flagship Phase 11 PINN training notebook
+        ├── pinn_model_v2 (2).pth       # Model weights checkpoint
+        ├── priority_survey_sites.csv   # Top 100 prioritized exploration sites
+        ├── Fig_Journal_Evaluation.png  # 300 DPI multi-model evaluation figure
+        └── Fig_Journal_Evaluation.pdf  # Vector graphic evaluation figure
+```
+
+---
+
 ## ⚡ Quickstart Guide
 
 ### Prerequisites
