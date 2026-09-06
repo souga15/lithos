@@ -1,0 +1,64 @@
+project:
+  name: real_seismic_landslide_model
+  version: 0.1.0
+  random_seed: 42
+
+paths:
+  local_landslides_json: ../data/processed_landslides.json
+  nasa_landslides_csv: ../data/landslides/nasa_landslides.csv
+  kerala_landslides_csv: ../data/landslides/kerala_landslides.csv
+  northeast_landslides_csv: ../data/landslides/northeast_india_landslides.csv
+  slope_units_gpkg: ../lithos_all_slope_units_final.gpkg
+  normalized_events_csv: ./data/processed/normalized_landslide_events.csv
+  normalized_events_summary_json: ./data/processed/normalized_landslide_events_summary.json
+  seismic_enriched_csv: ./data/processed/normalized_landslide_events_seismic.csv
+  seismic_enriched_summary_json: ./data/processed/normalized_landslide_events_seismic_summary.json
+  local_geospatial_enriched_csv: ./data/processed/normalized_landslide_events_local_geospatial.csv
+  local_geospatial_summary_json: ./data/processed/normalized_landslide_events_local_geospatial_summary.json
+  training_table_csv: ./data/processed/hybrid_training_table.csv
+  training_table_summary_json: ./data/processed/hybrid_training_table_summary.json
+  usgs_cache_json: ./data/raw/usgs_event_cache.json
+  sar_dir: ../data/sar
+  raw_dir: ./data/raw
+  interim_dir: ./data/interim
+  processed_dir: ./data/processed
+  model_dir: ./models
+
+targets:
+  landslide_label: landslide_occurrence
+  earthquake_label: earthquake_triggered
+  dry_shear_label: dry_soil_shear_failure
+
+physics:
+  gravity_unit_weight_knm3: 18.0
+  water_unit_weight_knm3: 9.81
+  default_depth_m: 3.0
+  default_cohesion_kpa: 12.0
+  default_friction_angle_deg: 28.0
+  critical_newmark_displacement_cm: 5.0
+
+model:
+  empirical_model: xgboost
+  fusion_weight_empirical: 0.6
+  fusion_weight_physics: 0.4
+  trigger_model_path: ./models/earthquake_trigger_model.joblib
+  trigger_model_metadata_path: ./models/earthquake_trigger_model_metadata.json
+  dry_shear_model_path: ./models/dry_shear_model.joblib
+  dry_shear_model_metadata_path: ./models/dry_shear_model_metadata.json
+
+seismic:
+  usgs_event_api_url: https://earthquake.usgs.gov/fdsnws/event/1/query
+  time_window_days: 3
+  search_radius_km: 300
+  min_magnitude: 4.0
+  pga_cap_g: 1.5
+  fallback_lookup_for_nonearthquake_rows: false
+
+splits:
+  validation_fraction: 0.2
+  test_fraction: 0.1
+  group_by: region
+
+evaluation:
+  earthquake_negative_ratio: 3
+  random_seed: 42

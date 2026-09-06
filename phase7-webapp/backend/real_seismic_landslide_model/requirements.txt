@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+pydantic
+numpy
+pandas
+scikit-learn
+xgboost
+scipy
+pyyaml
+requests
+python-dateutil
+rasterio
+geopandas
+shapely
+pytest

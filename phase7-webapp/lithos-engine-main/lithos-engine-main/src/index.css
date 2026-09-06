@@ -1,0 +1,305 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   LITHOS — Cinematic Enterprise Design System
+   Inspired by WorldQuant Foundry · WAM.global · Sansara
+   ============================================================ */
+
+/* ─── CSS Variables ──────────────────────────────────────── */
+:root {
+  --bg:        #050814;
+  --surface:   #090d1c;
+  --nav:       #07091a;
+  --panel:     #0b0f22;
+  --accent:    #2B9EFF;
+  --accent-dim:#1a6bc4;
+  --risk-red:  #E63946;
+  --risk-orange:#F4A261;
+  --risk-green:#2DC77A;
+  --risk-yellow:#E9C46A;
+  --muted:     #3A3F55;
+  --silver:    #8A8FA8;
+  --border:    rgba(255,255,255,0.05);
+  --border-dim:rgba(255,255,255,0.03);
+}
+
+/* ─── Base Styles ────────────────────────────────────────── */
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  @apply bg-bg text-white font-sans;
+  overflow-x: hidden;
+  caret-color: var(--accent);
+}
+
+::selection {
+  background: rgba(43, 158, 255, 0.25);
+  color: #fff;
+}
+
+/* ─── Noise / Grain Overlay (Cinematic Texture) ──────────── */
+/* Apply .noise-overlay to the root #root div for full-app grain */
+.noise-overlay::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  pointer-events: none;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 128px 128px;
+}
+
+/* ─── Glass Utilities ────────────────────────────────────── */
+.glass {
+  background: rgba(255, 255, 255, 0.012);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset;
+}
+
+.glass-elevated {
+  background: rgba(255, 255, 255, 0.025);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.06) inset,
+    0 8px 32px rgba(0,0,0,0.5);
+}
+
+.glass-dark {
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+/* ─── Monospace / Terminal Data ──────────────────────────── */
+.data-mono {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' on, 'lnum' on;
+  letter-spacing: -0.01em;
+}
+
+.label-micro {
+  @apply text-2xs font-bold uppercase tracking-widest;
+  color: var(--silver);
+}
+
+/* ─── Navigation Links ───────────────────────────────────── */
+.nav-link {
+  @apply px-3 py-1.5 text-xs font-medium text-white/50 transition-all duration-150 rounded;
+  letter-spacing: 0.02em;
+}
+
+.nav-link:hover {
+  color: rgba(255,255,255,0.9);
+  background: rgba(255,255,255,0.04);
+}
+
+.nav-link.active {
+  color: var(--accent);
+  background: rgba(43, 158, 255, 0.08);
+  border-bottom: 1px solid var(--accent);
+  border-radius: 0;
+}
+
+/* ─── Focus States (replace browser default) ─────────────── */
+*:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 1px var(--accent), 0 0 8px rgba(43,158,255,0.2);
+  border-radius: 4px;
+}
+
+/* ─── Interactive Row Hover (data tables) ────────────────── */
+.data-row {
+  @apply transition-all duration-100 border-l-2 border-transparent;
+}
+.data-row:hover {
+  background: rgba(255,255,255,0.015);
+  border-left-color: var(--accent);
+}
+
+/* ─── Skeleton Loading ───────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.03) 0%,
+    rgba(255,255,255,0.06) 50%,
+    rgba(255,255,255,0.03) 100%
+  );
+  background-size: 400px 100%;
+  animation: shimmer 2.5s linear infinite;
+  border-radius: 3px;
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────── */
+::-webkit-scrollbar       { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.08);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(43,158,255,0.35);
+}
+
+/* ─── Button Utilities ───────────────────────────────────── */
+.btn-primary {
+  @apply inline-flex items-center justify-center gap-2 font-semibold transition-all duration-150;
+  background: var(--accent);
+  color: #050814;
+  padding: 0.625rem 1.25rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.btn-primary:hover {
+  background: #4db3ff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(43,158,255,0.3);
+}
+.btn-primary:active { transform: translateY(0); }
+
+.btn-ghost {
+  @apply inline-flex items-center justify-center gap-2 font-medium transition-all duration-150;
+  background: transparent;
+  color: rgba(255,255,255,0.5);
+  padding: 0.5rem 1rem;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 6px;
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
+}
+.btn-ghost:hover {
+  background: rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.9);
+  border-color: rgba(255,255,255,0.12);
+}
+
+/* ─── Risk Badge Utilities ───────────────────────────────── */
+.badge-red    { background: rgba(230,57,70,0.1);  color: #E63946; border: 1px solid rgba(230,57,70,0.25);  }
+.badge-orange { background: rgba(244,162,97,0.1); color: #F4A261; border: 1px solid rgba(244,162,97,0.25); }
+.badge-green  { background: rgba(45,199,122,0.1); color: #2DC77A; border: 1px solid rgba(45,199,122,0.25); }
+.badge-yellow { background: rgba(233,196,106,0.1);color: #E9C46A; border: 1px solid rgba(233,196,106,0.25);}
+
+/* ─── Section Heading Accent ─────────────────────────────── */
+.heading-accent {
+  @apply flex items-center gap-3 text-xs font-semibold uppercase tracking-widest text-white/40;
+}
+.heading-accent::before {
+  content: '';
+  display: block;
+  width: 3px;
+  height: 14px;
+  background: var(--accent);
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* ─── Leaflet Map Overrides ──────────────────────────────── */
+.leaflet-container          { background: #050814 !important; }
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip          { @apply glass; color: #fff; }
+.leaflet-control-zoom-in,
+.leaflet-control-zoom-out   {
+  background: rgba(9,13,28,0.9) !important;
+  color: rgba(255,255,255,0.7) !important;
+  border: 1px solid rgba(255,255,255,0.06) !important;
+  backdrop-filter: blur(8px);
+}
+.leaflet-control-zoom-in:hover,
+.leaflet-control-zoom-out:hover {
+  background: rgba(255,255,255,0.06) !important;
+  color: #fff !important;
+}
+
+/* ─── Radar / Sonar Animations ───────────────────────────── */
+.nav-scan-ring-1 { animation: scan-ring   3s ease-out infinite; }
+.nav-scan-ring-2 { animation: scan-ring-2 3s ease-out infinite 1s; }
+.nav-scan-ring-3 { animation: scan-ring-3 3s ease-out infinite 2s; }
+.nav-sonar-sweep { animation: sonar-sweep 4s linear infinite; }
+
+/* ─── Keyframes ──────────────────────────────────────────── */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 0.4; transform: scale(0.85); }
+  50%       { opacity: 1;   transform: scale(1.1);  }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1;   }
+  50%       { opacity: 0.4; }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px);  }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+@keyframes slide-down {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(8px);  }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+@keyframes loading-bar {
+  0%   { transform: translateX(-100%) scaleX(0.5); }
+  50%  { transform: translateX(0%)    scaleX(1);   }
+  100% { transform: translateX(100%)  scaleX(0.5); }
+}
+
+@keyframes scan-ring {
+  from { transform: translate(-50%,-50%) scale(0.2); opacity: 0.8; }
+  to   { transform: translate(-50%,-50%) scale(3.5); opacity: 0;   }
+}
+
+@keyframes scan-ring-2 {
+  from { transform: translate(-50%,-50%) scale(0.2); opacity: 0.6; }
+  to   { transform: translate(-50%,-50%) scale(5.0); opacity: 0;   }
+}
+
+@keyframes scan-ring-3 {
+  from { transform: translate(-50%,-50%) scale(0.2); opacity: 0.4; }
+  to   { transform: translate(-50%,-50%) scale(7.0); opacity: 0;   }
+}
+
+@keyframes sonar-sweep {
+  from { transform: translate(-50%,-50%) rotate(0deg);   }
+  to   { transform: translate(-50%,-50%) rotate(360deg); }
+}
+
+/* ─── Print Styles ───────────────────────────────────────── */
+@media print {
+  @page { size: A4; margin: 10mm; }
+  body { background: white !important; color: black !important; }
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  ::-webkit-scrollbar { display: none; }
+  .glass, .glass-elevated, .glass-dark {
+    background: transparent !important;
+    border: 1px solid #ccc !important;
+    box-shadow: none !important;
+    color: black !important;
+    backdrop-filter: none !important;
+  }
+  .text-white, [class*="text-white"] { color: black !important; }
+}

@@ -1,0 +1,137 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   LITHOS — Sanrita-Inspired Topographic Design 
+   Phase 8 Redesign (Framer Motion + Pretext)
+   ============================================================ */
+
+:root {
+  /* Terrain Dark Palette */
+  --bg:         #1a1e14;
+  --surface:    #222618;
+  --nav:        #1c2014;
+  --panel:      #282c1e;
+  
+  /* Primary Accents */
+  --accent:     #c8f57a;   /* Neon lime */
+  --accent-dim: #8ab84a;
+  
+  /* Semantic Risk Tones */
+  --risk-red:   #ff4d4f;
+  --risk-orange:#f97316;
+  --risk-green: #c8f57a;
+  --risk-yellow:#fbbf24;
+  
+  /* Neutrals */
+  --muted:      #4a5240;
+  --silver:     #84907f;
+  
+  --border:     rgba(200, 245, 122, 0.08); /* slight lime tint for borders */
+}
+
+/* ─── Base Styles ────────────────────────────────────────── */
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  @apply bg-bg text-white font-sans;
+  overflow-x: hidden;
+  caret-color: var(--accent);
+}
+
+::selection {
+  background: rgba(200, 245, 122, 0.25);
+  color: #fff;
+}
+
+/* ─── Typography Utils ────────────────────────────────────── */
+.font-display {
+  font-family: 'Barlow Condensed', sans-serif;
+  text-transform: uppercase;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.data-mono {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' on, 'lnum' on;
+  letter-spacing: -0.01em;
+}
+
+.label-micro {
+  @apply text-2xs font-bold uppercase tracking-widest;
+  color: var(--silver);
+}
+
+/* ─── Topographic Texture ────────────────────────────────── */
+/* Custom contour line pattern */
+.topo-texture::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.06;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c13.866 0 25.368 11.439 25 25.314-C35.632 57.18 47.134 68.618 61 68.618' stroke='%23C8F57A' stroke-width='1' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M21 28c13.866 0 25.368 11.439 25 25.314C45.632 67.18 57.134 78.618 71 78.618' stroke='%23C8F57A' stroke-width='0.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-size: 150px 150px;
+}
+
+/* ─── Cards & Panels ─────────────────────────────────────── */
+.glass {
+  background: rgba(40, 44, 30, 0.4);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 0 rgba(200,245,122,0.02) inset;
+}
+
+.glass-elevated {
+  background: rgba(40, 44, 30, 0.7);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(200,245,122,0.15);
+  box-shadow:
+    0 1px 0 rgba(200,245,122,0.1) inset,
+    0 8px 32px rgba(0,0,0,0.6);
+}
+
+/* ─── Interactive Utilities ──────────────────────────────── */
+.btn-primary {
+  @apply inline-flex items-center justify-center gap-2 font-display transition-all duration-150;
+  background: var(--accent);
+  color: #1a1e14;
+  padding: 0.625rem 1.25rem;
+  border-radius: 4px;
+  font-size: 1rem;
+  box-shadow: 0 0 12px rgba(200,245,122,0.3);
+}
+
+.btn-primary:hover {
+  background: #dbff99;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(200,245,122,0.5);
+}
+
+.btn-primary:active { transform: translateY(0); }
+
+/* Custom Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(200, 245, 122, 0.1);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(200, 245, 122, 0.3); }
+
+/* Form inputs & focus states */
+*:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+  border-radius: 2px;
+}

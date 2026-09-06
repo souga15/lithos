@@ -1,0 +1,75 @@
+# ==============================================================================
+# LITHOS - Git Ignore Configuration
+# ==============================================================================
+
+# Node / Frontend dependencies & builds
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+build/
+**/build/
+.vite/
+**/.vite/
+.output/
+
+# Python Virtual Environments & Bytecode
+.venv/
+**/.venv/
+venv/
+**/venv/
+env/
+**/env/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.pytest_cache/
+*.ipynb_checkpoints/
+**/.ipynb_checkpoints/
+*.dll
+
+# Environment Variables & Secrets
+.env
+.env.local
+.env.*.local
+
+# Operating System Files
+desktop.ini
+Thumbs.db
+.DS_Store
+*.tmp
+*.log
+*.zip
+**/*.zip
+
+# Large Datasets & Raw Satellite Archives (>50MB / GitHub 100MB Limit)
+*.gpkg
+**/*.gpkg
+*lithos_all_ne_slope_units_final*
+*.SAFE
+**/*.SAFE
+*.SAFE.zip
+**/*.SAFE.zip
+*.tif
+**/*.tif
+*.tiff
+**/*.tiff
+*.jp2
+**/*.jp2
+*units_enriched*
+*usgs_event_cache*
+*terrain_cache*
+*Phase2_data*
+**/*Phase2_data*/**
+LandslideAtlas_new_2023.pdf
+
+# Temporary scripts
+check_git_files.py
+scratch_extract_nb.py
+
+# IDE / Editor Files
+.vscode/
+.idea/
+*.swp
+*.swo

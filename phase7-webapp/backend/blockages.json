@@ -1,0 +1,11 @@
+[
+  {
+    "id": "blk_20260323_153250",
+    "lat": 22.135321,
+    "lon": 82.141338,
+    "message": "Road blocked \u2014 reported by LITHOS user",
+    "reported_at": "2026-03-23T15:32:50.342828+00:00",
+    "expires_at": "2026-03-23T19:32:50.342828+00:00",
+    "confirm_count": 1
+  }
+]

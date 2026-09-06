@@ -1,0 +1,36 @@
+{
+  "short_name": "LITHOS",
+  "name": "LITHOS — Landslide Intelligence",
+  "description": "Real-time landslide prediction and safe road routing system.",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0A0E1A",
+  "display": "standalone",
+  "theme_color": "#0A0E1A",
+  "dir": "ltr",
+  "lang": "en-US",
+  "orientation": "portrait-primary",
+  "shortcuts": [
+    {
+      "name": "Safe Route",
+      "url": "/route",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Live Alerts",
+      "url": "/alerts",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}
