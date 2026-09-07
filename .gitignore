@@ -44,6 +44,8 @@ Thumbs.db
 .DS_Store
 *.tmp
 *.log
+seen_titles.json
+*.cache
 *.zip
 **/*.zip
 
