@@ -1,0 +1,65 @@
+[
+  {
+    "key": "cherrapunji",
+    "name": "Cherrapunji, Meghalaya",
+    "lat": 25.3,
+    "lon": 91.8,
+    "zone": "northeast"
+  },
+  {
+    "key": "sikkim",
+    "name": "Sikkim",
+    "lat": 27.55,
+    "lon": 88.45,
+    "zone": "northeast"
+  },
+  {
+    "key": "manipur_nh2",
+    "name": "Manipur NH2",
+    "lat": 25.0,
+    "lon": 93.75,
+    "zone": "northeast"
+  },
+  {
+    "key": "arunachal_w",
+    "name": "Arunachal Pradesh (W)",
+    "lat": 27.25,
+    "lon": 93.25,
+    "zone": "northeast"
+  },
+  {
+    "key": "nagaland",
+    "name": "Nagaland Hills",
+    "lat": 26.25,
+    "lon": 94.25,
+    "zone": "northeast"
+  },
+  {
+    "key": "assam_hills",
+    "name": "Assam Hills",
+    "lat": 26.0,
+    "lon": 92.5,
+    "zone": "northeast"
+  },
+  {
+    "key": "wayanad",
+    "name": "Wayanad, Kerala",
+    "lat": 11.7,
+    "lon": 76.05,
+    "zone": "kerala"
+  },
+  {
+    "key": "idukki",
+    "name": "Idukki, Kerala",
+    "lat": 10.1,
+    "lon": 77.05,
+    "zone": "kerala"
+  },
+  {
+    "key": "munnar",
+    "name": "Munnar, Kerala",
+    "lat": 10.15,
+    "lon": 77.2,
+    "zone": "kerala"
+  }
+]
