@@ -1,6 +1,6 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMapEvents, GeoJSON } from 'react-leaflet';
-import { Route as RouteIcon, AlertTriangle, Search, Navigation, Map as MapIcon, Layers, Globe, Loader2 } from 'lucide-react';
+import { Route as RouteIcon, AlertTriangle, Search, Navigation, Map as MapIcon, Layers, Globe, Loader2, MapPin, X, ArrowUpDown, Play, Pause, RotateCcw, Volume2, VolumeX, Sparkles, ChevronRight, Compass, Gauge, SlidersHorizontal } from 'lucide-react';
 import L from 'leaflet';
 import axios from 'axios';
 import API_BASE_URL from '../apiConfig';
@@ -9,6 +9,43 @@ import RiskBadge from '../components/RiskBadge';
 import SOSButton from '../components/SOSButton';
 import BlockageReport from '../components/BlockageReport';
 import RainfallClock from '../components/RainfallClock';
+
+// ── Demo Presets for Academic / Evaluation Presentation ───────────────────────
+const DEMO_PRESETS = [
+  {
+    id: 'sikkim-nh310',
+    name: 'Sikkim NH-310: Gangtok ➔ Nathu La Pass',
+    badge: 'Himalayan Pass',
+    regionKey: 'sikkim',
+    desc: 'High-altitude strategic corridor with steep terrain & active rockfall screening',
+    start: { lat: 27.3290, lng: 88.6123 },
+    startLabel: 'Gangtok (MG Marg)',
+    end: { lat: 27.3868, lng: 88.8309 },
+    endLabel: 'Nathu La Pass (4,310m)',
+  },
+  {
+    id: 'cherra-sh5',
+    name: 'Meghalaya SH-5: Shillong ➔ Cherrapunji',
+    badge: 'Rainfall Escarpment',
+    regionKey: 'cherrapunji',
+    desc: 'High-precipitation canyon escarpment with pore-water saturation monitoring',
+    start: { lat: 25.5788, lng: 91.8933 },
+    startLabel: 'Shillong Central',
+    end: { lat: 25.2702, lng: 91.7323 },
+    endLabel: 'Sohra Eco Park',
+  },
+  {
+    id: 'wayanad-ghat',
+    name: 'Western Ghats: Kalpetta ➔ Vythiri Pass',
+    badge: 'Steep Ghat Road',
+    regionKey: 'wayanad',
+    desc: 'Vulnerable Western Ghats mountain road prone to monsoon debris runoff',
+    start: { lat: 11.6094, lng: 76.0827 },
+    startLabel: 'Kalpetta Junction',
+    end: { lat: 11.5510, lng: 76.0410 },
+    endLabel: 'Vythiri Ghat Pass',
+  },
+];
 
 // CesiumTerrain3D loaded lazily so 2D map still works if cesium pkg not yet installed
 const CesiumTerrain3DLazy = React.lazy(() =>
@@ -66,6 +103,14 @@ const SafeRoute = () => {
   const [showEvacuation, setShowEvacuation] = useState(false);
   const sessionId = React.useRef(`lithos_${Math.random().toString(36).slice(2)}`);
 
+  // ── Demo Presentation State ──
+  const [isDemoMode, setIsDemoMode] = useState(false);
+  const [demoSpeed, setDemoSpeed] = useState(4); // 4x or 10x
+  const [isDemoPlaying, setIsDemoPlaying] = useState(false);
+  const [demoMuted, setDemoMuted] = useState(true);
+  const [show2DToolsDrawer, setShow2DToolsDrawer] = useState(false);
+  const demoTimerRef = React.useRef(null);
+
 
   // Screen Wake Lock Reference
   const wakeLockRef = React.useRef(null);
@@ -100,7 +145,12 @@ const SafeRoute = () => {
       const cached = localStorage.getItem('active_route_full');
       if (cached) {
         const parsed = JSON.parse(cached);
-        setRouteResult(parsed);
+        // Only restore if high-resolution road route (or short corridor like wayanad)
+        if (parsed.route?.segments?.length > 300) {
+          setRouteResult(parsed);
+        } else {
+          localStorage.removeItem('active_route_full');
+        }
       }
     } catch (e) { console.error("Cache load failed", e); }
 
@@ -340,6 +390,61 @@ const SafeRoute = () => {
     }
   };
 
+  // ── Load Demo Preset ──────────────────────────────────────────────────────
+  const loadDemoPreset = async (preset) => {
+    const reg = regions.find(r => r.key === preset.regionKey) || regions[0] || { key: preset.regionKey, name: preset.name };
+    setSelectedRegion(reg);
+    setStart(preset.start);
+    setStartQuery(preset.startLabel);
+    setEnd(preset.end);
+    setEndQuery(preset.endLabel);
+    setFocusPoint(preset.start);
+    setLoading(true);
+
+    try {
+      const resp = await axios.post(`${API_BASE_URL}/api/route`, {
+        start_lat: preset.start.lat,
+        start_lon: preset.start.lng,
+        end_lat: preset.end.lat,
+        end_lon: preset.end.lng,
+        region: reg.key
+      });
+      setRouteResult(resp.data);
+      setNavIndex(0);
+      const firstSeg = resp.data.route?.segments?.[0];
+      setCarPosition({
+        lat: preset.start.lat,
+        lng: preset.start.lng,
+        risk: firstSeg ? firstSeg.risk_level : 'GREEN'
+      });
+      try {
+        localStorage.setItem('active_route_full', JSON.stringify(resp.data));
+      } catch (_) {}
+    } catch (err) {
+      console.error("Demo route error:", err);
+      alert('Error fetching demo corridor route. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Start Demo Simulation (4x / 10x Speed) ────────────────────────────────
+  const startDemoSimulation = (speed = demoSpeed) => {
+    if (!routeResult || !routeResult.route?.segments?.length) return;
+    setIsNavigating(true);
+    setIsDemoMode(true);
+    setIsDemoPlaying(true);
+    setDemoSpeed(speed);
+    setNavIndex(0);
+    const firstSeg = routeResult.route.segments[0];
+    setCarPosition({
+      lat: firstSeg.lat,
+      lng: firstSeg.lon ?? firstSeg.lng,
+      risk: firstSeg.risk_level || 'GREEN'
+    });
+    if (!demoMuted) speak(`Starting corridor presentation at ${speed}x real-time speed.`);
+  };
+
   const handleSearch = async (query, setPointFunc, setQueryFunc) => {
     if (!query) return;
     try {
@@ -350,6 +455,18 @@ const SafeRoute = () => {
         setPointFunc(newPoint);
         setQueryFunc(display_name.split(',')[0]);
         setFocusPoint(newPoint);
+
+        // Auto-select the closest region if within coverage range
+        if (regions && regions.length > 0) {
+          const closestReg = regions.reduce((best, r) => {
+            if (!r.center) return best;
+            const dist = Math.hypot(r.center[0] - newPoint.lat, r.center[1] - newPoint.lng);
+            return (!best || dist < best.dist) ? { reg: r, dist } : best;
+          }, null);
+          if (closestReg && closestReg.dist < 1.8 && selectedRegion?.key !== closestReg.reg.key) {
+            setSelectedRegion(closestReg.reg);
+          }
+        }
       } else {
         alert("Location not found");
       }
@@ -372,9 +489,10 @@ const SafeRoute = () => {
     return { index: closestIndex, distance: minDistance };
   };
 
+  // ── Standard GPS Tracking (Active ONLY when NOT in Demo Simulation) ──────
   useEffect(() => {
     let watchId;
-    if (isNavigating && routeResult && routeResult.route.segments.length > 0) {
+    if (isNavigating && !isDemoMode && routeResult && routeResult.route.segments.length > 0) {
       speak("Starting live navigation. Please ensure your map area is loaded before entering offline regions.");
       requestWakeLock();
 
@@ -416,7 +534,46 @@ const SafeRoute = () => {
       releaseWakeLock();
       if (watchId) navigator.geolocation.clearWatch(watchId);
     };
-  }, [isNavigating, routeResult]);
+  }, [isNavigating, isDemoMode, routeResult]);
+
+  // ── Demo Presentation Playback Engine (4x / 10x speed) ───────────────────
+  useEffect(() => {
+    clearInterval(demoTimerRef.current);
+
+    if (isDemoMode && isNavigating && isDemoPlaying && routeResult && routeResult.route?.segments?.length) {
+      const segments = routeResult.route.segments;
+      // 4x speed = ~220ms per road segment. 10x speed = ~80ms per road segment.
+      const intervalMs = demoSpeed === 10 ? 80 : demoSpeed === 4 ? 220 : 800;
+
+      demoTimerRef.current = setInterval(() => {
+        setNavIndex((prevIdx) => {
+          const stepSize = demoSpeed === 10
+            ? Math.max(1, Math.round(segments.length / 280))
+            : demoSpeed === 4
+            ? Math.max(1, Math.round(segments.length / 550))
+            : 1;
+
+          const nextIdx = prevIdx + stepSize;
+          if (nextIdx >= segments.length) {
+            clearInterval(demoTimerRef.current);
+            setIsDemoPlaying(false);
+            setShowCertificate(true);
+            if (!demoMuted) speak("Demonstration complete. Vehicle reached destination safely.");
+            return segments.length - 1;
+          }
+          const seg = segments[nextIdx];
+          setCarPosition({
+            lat: seg.lat,
+            lng: seg.lon ?? seg.lng,
+            risk: seg.risk_level || 'GREEN'
+          });
+          return nextIdx;
+        });
+      }, intervalMs);
+    }
+
+    return () => clearInterval(demoTimerRef.current);
+  }, [isDemoMode, isNavigating, isDemoPlaying, demoSpeed, routeResult, demoMuted]);
 
   // Proximity Alerts for critical slopes
   useEffect(() => {
@@ -458,15 +615,17 @@ const SafeRoute = () => {
 
       // Voice Alerts for Risk Transfer
       if (seg.risk_level !== prevRisk.current) {
-        if (seg.risk_level === 'RED') {
-          speak("Warning — entering high risk landslide zone. Consider alternative route.");
-        } else if (seg.risk_level === 'GREEN' && prevRisk.current === 'RED') {
-          speak("Leaving danger zone — route is now safe.");
+        if (!demoMuted) {
+          if (seg.risk_level === 'RED') {
+            speak("Warning — entering high risk landslide zone. Consider alternative route.");
+          } else if (seg.risk_level === 'GREEN' && prevRisk.current === 'RED') {
+            speak("Leaving danger zone — route is now safe.");
+          }
         }
         prevRisk.current = seg.risk_level;
       }
     }
-  }, [navIndex, isNavigating, routeResult]);
+  }, [navIndex, isNavigating, routeResult, demoMuted]);
 
   const MapEvents = () => {
     useMapEvents({
@@ -504,36 +663,47 @@ const SafeRoute = () => {
     <div className="absolute inset-0 flex flex-col lg:flex-row animate-fade-in overflow-hidden">
       {/* Sidebar Panel - Hidden during Navigation */}
       {!isNavigating && (
-        <div className="w-full lg:w-[400px] h-[40%] lg:h-full glass border-r border-white/10 z-20 flex flex-col p-6 overflow-y-auto shrink-0 transition-all duration-500">
-          {/* ... existing sidebar content ... */}
-          <h1 className="text-xl font-black italic tracking-tighter mb-1 uppercase flex items-center gap-2">
-            <RouteIcon className="w-6 h-6 text-accent" /> Safe Route Finder
-          </h1>
-          <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-4">AI-Powered Risk Avoidance</p>
+        <div className="w-full lg:w-[380px] h-[45%] lg:h-full bg-slate-950/95 border-r border-slate-800/90 z-20 flex flex-col p-4 sm:p-5 overflow-y-auto shrink-0 transition-all duration-300">
+          {/* Header */}
+          <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-800/80">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+                <RouteIcon className="w-4 h-4" />
+              </div>
+              <div>
+                <h1 className="text-sm font-semibold text-slate-100 tracking-tight">Safe Route Navigation</h1>
+                <p className="text-[11px] text-slate-400">Hazard-aware pathfinding & live tracking</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span>AI Active</span>
+            </div>
+          </div>
 
-          {/* Rainfall Monitor */}
-          {selectedRegion && <RainfallClock region={selectedRegion.key} />}
-
-          <div className="space-y-4 flex-grow">
-            <div>
-              <label className="text-[10px] font-black text-accent uppercase tracking-widest mb-1.5 block">SELECT REGION</label>
-              <select
-                className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-sm font-bold appearance-none outline-none focus:border-accent transition-all"
-                value={selectedRegion?.key}
-                onChange={(e) => setSelectedRegion(regions.find(r => r.key === e.target.value))}
-              >
-                {regions.map(r => <option key={r.key} value={r.key} className="bg-bg">{r.name}</option>)}
-              </select>
+          {/* Region & View controls */}
+          <div className="grid grid-cols-5 gap-2 mb-3">
+            <div className="col-span-3">
+              <label className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider block mb-1">Region</label>
+              <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1.5 shadow-sm">
+                <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                <select
+                  className="w-full bg-transparent text-xs font-medium text-slate-200 outline-none cursor-pointer"
+                  value={selectedRegion?.key}
+                  onChange={(e) => setSelectedRegion(regions.find(r => r.key === e.target.value))}
+                >
+                  {regions.map(r => <option key={r.key} value={r.key} className="bg-slate-900 text-slate-100">{r.name}</option>)}
+                </select>
+              </div>
             </div>
 
-            {/* ── Map Style Toggle ─────────────────────────── */}
-            <div>
-              <label className="text-[10px] font-black text-accent uppercase tracking-widest mb-1.5 block">MAP VIEW</label>
-              <div className="grid grid-cols-3 gap-1.5">
+            <div className="col-span-2">
+              <label className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider block mb-1">Map Layer</label>
+              <div className="bg-slate-900 border border-slate-700/80 rounded-lg p-0.5 flex items-center gap-0.5 shadow-sm">
                 {[
-                  { id: 'dark',   label: '2D Dark',    Icon: MapIcon },
-                  { id: 'street', label: '2D Street',  Icon: Layers },
-                  { id: '3d',     label: '3D Terrain', Icon: Globe },
+                  { id: 'dark', label: 'Dark', Icon: MapIcon },
+                  { id: 'street', label: 'Sat', Icon: Layers },
+                  { id: '3d', label: '3D', Icon: Globe },
                 ].map(({ id, label, Icon }) => (
                   <button
                     key={id}
@@ -541,166 +711,232 @@ const SafeRoute = () => {
                       setMapStyle(id);
                       localStorage.setItem('lithos_mapstyle', id);
                     }}
-                    className={`py-2 rounded-xl text-[10px] font-black uppercase tracking-wider border transition-all flex flex-col items-center gap-1 ${
+                    className={`flex-1 flex items-center justify-center gap-1 py-1 rounded text-[11px] transition-colors ${
                       mapStyle === id
-                        ? 'bg-accent text-bg border-accent shadow-glow scale-[1.04]'
-                        : 'bg-white/5 text-white/60 border-white/10 hover:border-white/30 hover:text-white'
+                        ? 'bg-slate-800 text-slate-100 font-semibold border border-slate-600 shadow-sm'
+                        : 'text-slate-400 hover:text-slate-200 border border-transparent font-medium'
                     }`}
+                    title={label}
                   >
-                    <Icon className="w-4 h-4" />
-                    <span className="leading-none">{label}</span>
+                    <Icon className="w-3 h-3" />
+                    <span>{label}</span>
                   </button>
                 ))}
               </div>
             </div>
+          </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className={`p-3 rounded-xl border transition-all ${start ? 'bg-[#FFD60A]/10 border-[#FFD60A]/30' : 'bg-white/3 border-white/10'}`}>
-                <div className="flex justify-between items-center mb-1">
-                  <p className="text-[8px] font-black uppercase opacity-60">POINT A (START)</p>
-                  {!start && <span className="text-[8px] font-bold text-[#FFD60A] animate-pulse">Click map to drop pin</span>}
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={startQuery}
-                    onChange={e => setStartQuery(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleSearch(startQuery, setStart, setStartQuery)}
-                    placeholder={start ? `${start.lat.toFixed(4)}, ${start.lng.toFixed(4)}` : "Enter location or click map"}
-                    className="w-full bg-transparent outline-none text-[10px] font-bold"
-                    disabled={loading}
-                  />
-                  <button onClick={() => handleSearch(startQuery, setStart, setStartQuery)} disabled={loading} className="opacity-50 hover:opacity-100"><Search className="w-3.5 h-3.5" /></button>
-                </div>
+          {/* Waypoints Card */}
+          <div className="bg-slate-900/80 border border-slate-800/90 rounded-xl p-3 mb-3 shadow-sm">
+            <div className="space-y-2">
+              {/* Origin */}
+              <div className="bg-slate-950/70 border border-slate-800 rounded-lg px-2.5 py-1.5 focus-within:border-slate-600 transition-colors flex items-center gap-2">
+                <input
+                  type="text"
+                  value={startQuery}
+                  onChange={e => setStartQuery(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleSearch(startQuery, setStart, setStartQuery)}
+                  placeholder={start ? `${start.lat.toFixed(4)}, ${start.lng.toFixed(4)}` : "Origin (or click map)"}
+                  className="w-full bg-transparent outline-none text-xs text-slate-200 placeholder-slate-500 font-medium"
+                  disabled={loading}
+                />
+                {start && (
+                  <button onClick={() => { setStart(null); setStartQuery(''); }} className="text-slate-500 hover:text-slate-300">
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+                <button 
+                  onClick={() => handleSearch(startQuery, setStart, setStartQuery)} 
+                  disabled={loading} 
+                  className="text-slate-400 hover:text-slate-200 shrink-0"
+                  title="Search origin"
+                >
+                  <Search className="w-3.5 h-3.5" />
+                </button>
               </div>
-              <div className={`p-3 rounded-xl border transition-all ${end ? 'bg-risk-red/10 border-risk-red/30' : 'bg-white/3 border-white/10'}`}>
-                <div className="flex justify-between items-center mb-1">
-                  <p className="text-[8px] font-black uppercase opacity-60">POINT B (END)</p>
-                  {start && !end && <span className="text-[8px] font-bold text-risk-red animate-pulse">Click map to drop pin</span>}
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={endQuery}
-                    onChange={e => setEndQuery(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleSearch(endQuery, setEnd, setEndQuery)}
-                    placeholder={end ? `${end.lat.toFixed(4)}, ${end.lng.toFixed(4)}` : "Enter destination or click map"}
-                    className="w-full bg-transparent outline-none text-[10px] font-bold"
-                    disabled={loading}
-                  />
-                  <button onClick={() => handleSearch(endQuery, setEnd, setEndQuery)} disabled={loading} className="opacity-50 hover:opacity-100"><Search className="w-3.5 h-3.5" /></button>
-                </div>
+
+              {/* Destination */}
+              <div className="bg-slate-950/70 border border-slate-800 rounded-lg px-2.5 py-1.5 focus-within:border-slate-600 transition-colors flex items-center gap-2">
+                <input
+                  type="text"
+                  value={endQuery}
+                  onChange={e => setEndQuery(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleSearch(endQuery, setEnd, setEndQuery)}
+                  placeholder={end ? `${end.lat.toFixed(4)}, ${end.lng.toFixed(4)}` : "Destination (or click map)"}
+                  className="w-full bg-transparent outline-none text-xs text-slate-200 placeholder-slate-500 font-medium"
+                  disabled={loading}
+                />
+                {end && (
+                  <button onClick={() => { setEnd(null); setEndQuery(''); }} className="text-slate-500 hover:text-slate-300">
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+                <button 
+                  onClick={() => handleSearch(endQuery, setEnd, setEndQuery)} 
+                  disabled={loading} 
+                  className="text-slate-400 hover:text-slate-200 shrink-0"
+                  title="Search destination"
+                >
+                  <Search className="w-3.5 h-3.5" />
+                </button>
               </div>
             </div>
 
-            <button
-              onClick={calculateRoute}
-              disabled={!start || !end || loading}
-              className={`w-full py-4 rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 ${!start || !end ? 'bg-white/5 text-white/20 cursor-not-allowed' : 'bg-accent text-bg hover:scale-[1.02] shadow-glow'
-                }`}
-            >
-              {loading ? <Loader2 className="animate-spin w-5 h-5 text-bg" /> : 'CALCULATE SAFE ROUTE'}
-            </button>
-
-            {routeResult && (
-              <div className="space-y-4 animate-fade-in pt-4 border-t border-white/10">
-                <div className="bg-white/5 p-4 rounded-2xl border border-white/10">
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 className="text-lg font-black">{routeResult.route.distance_km} <span className="text-[10px] opacity-50 uppercase">km</span></h3>
-                      <p className="text-[10px] font-bold opacity-30 uppercase tracking-widest">Calculated Distance</p>
-                    </div>
-                    <RiskBadge level={routeResult.route.max_risk_level} score={routeResult.route.safe_score} />
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-[10px] font-black mb-1">
-                      <span className="opacity-40 uppercase">Safe segments</span>
-                      <span className="text-risk-green">
-                        {Math.round((routeResult.route.risk_summary.GREEN / (routeResult.route.risk_summary.RED + routeResult.route.risk_summary.ORANGE + routeResult.route.risk_summary.GREEN)) * 100)}%
-                      </span>
-                    </div>
-                    <div className="h-1.5 flex rounded-full overflow-hidden bg-white/5">
-                      <div className="h-full bg-risk-green" style={{ width: `${(routeResult.route.risk_summary.GREEN / (routeResult.route.risk_summary.RED + routeResult.route.risk_summary.ORANGE + routeResult.route.risk_summary.GREEN)) * 100}%` }} />
-                      <div className="h-full bg-risk-orange" style={{ width: `${(routeResult.route.risk_summary.ORANGE / (routeResult.route.risk_summary.RED + routeResult.route.risk_summary.ORANGE + routeResult.route.risk_summary.GREEN)) * 100}%` }} />
-                      <div className="h-full bg-risk-red" style={{ width: `${(routeResult.route.risk_summary.RED / (routeResult.route.risk_summary.RED + routeResult.route.risk_summary.ORANGE + routeResult.route.risk_summary.GREEN)) * 100}%` }} />
-                    </div>
-                  </div>
-                </div>
-
-                {routeResult.warnings.length > 0 && (
-                  <div className="bg-risk-red/10 border border-risk-red/30 p-3 rounded-xl space-y-2">
-                    {routeResult.warnings.map((w, i) => (
-                      <p key={i} className="text-[10px] font-bold text-risk-red flex items-start gap-2 italic">
-                        <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" /> {w}
-                      </p>
-                    ))}
-                  </div>
-                )}
-
-                {routeResult.runout_warnings && routeResult.runout_warnings.length > 0 && (
-                  <div className="bg-risk-red/20 border-2 border-risk-red p-3 rounded-xl animate-pulse">
-                    <p className="text-[10px] font-black text-risk-red uppercase tracking-widest mb-2 flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4" /> Active Runout Zones Detected
-                    </p>
-                    <div className="space-y-2">
-                      {routeResult.runout_warnings.map((rw, i) => (
-                        <div key={i} className="flex justify-between items-center text-[10px] font-bold text-white/90 bg-black/20 p-2 rounded-lg">
-                          <span>{rw.km_marker}: {rw.cell_id}</span>
-                          <span className="text-risk-red uppercase text-[8px] bg-white/10 px-1.5 py-0.5 rounded">Hazard</span>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="text-[9px] font-medium text-risk-red/80 mt-2 italic">
-                      Road segments may be blocked by active debris flow at these markers.
-                    </p>
-                  </div>
-                )}
-
-                <div className="space-y-3">
-                  <h3 className="text-[10px] font-black uppercase text-white/30 tracking-widest">Alternative Routes</h3>
-                  {routeResult.alternative_routes.map((alt, i) => (
-                    <div key={i} className="bg-white/3 border border-white/5 p-3 rounded-xl hover:bg-white/5 cursor-pointer transition-all">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <p className="text-xs font-black">{alt.distance_km} km</p>
-                          <p className="text-[9px] font-bold text-white/40">+{alt.extra_time_min} MIN DETOUR</p>
-                        </div>
-                        <RiskBadge level={alt.max_risk_level} className="scale-75 origin-right" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="pt-2">
-                  <button
-                    onClick={() => {
-                      setIsNavigating(true);
-                      setNavIndex(0);
-                      setCarPosition({ lat: start.lat, lng: start.lng });
-                      try {
-                        localStorage.setItem('active_route', JSON.stringify(routeResult.route.segments));
-                        localStorage.setItem('cached_risk_grid', JSON.stringify(riskGrid));
-                        localStorage.setItem('cache_timestamp', new Date().toISOString());
-                      } catch (e) {
-                        console.warn('LocalStorage quota exceeded during navigation start');
-                      }
-                    }}
-                    className="w-full py-3 rounded-xl font-black text-xs transition-all flex items-center justify-center gap-2 bg-accent text-bg shadow-glow hover:scale-[1.02]"
-                  >
-                    <Navigation className="w-4 h-4" /> START LIVE NAVIGATION
-                  </button>
-                </div>
-              </div>
-            )}
+            {/* Helper Status & Swap */}
+            <div className="mt-2 pt-2 border-t border-slate-800/70 flex items-center justify-between text-[11px] text-slate-400">
+              <span className="flex items-center gap-1">
+                <MapPin className="w-3 h-3 text-cyan-400" />
+                {!start ? 'Click map to place Origin' : !end ? 'Click map to place Destination' : 'Points ready'}
+              </span>
+              {start && end && (
+                <button 
+                  onClick={() => {
+                    const tempS = start; const tempQ = startQuery;
+                    setStart(end); setStartQuery(endQuery);
+                    setEnd(tempS); setEndQuery(tempQ);
+                  }}
+                  className="text-[10px] text-slate-400 hover:text-slate-200 flex items-center gap-1 font-medium transition-colors"
+                >
+                  <ArrowUpDown className="w-2.5 h-2.5" /> Swap
+                </button>
+              )}
+            </div>
           </div>
 
+          {/* Action Button */}
           <button
-            onClick={() => { setStart(null); setEnd(null); setRouteResult(null); setStartQuery(''); setEndQuery(''); setIsNavigating(false); setCarPosition(null); }}
-            className="mt-6 text-[10px] font-black text-white/30 hover:text-white uppercase tracking-widest block text-center"
+            onClick={calculateRoute}
+            disabled={!start || !end || loading}
+            className={`w-full py-2.5 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-2 mb-3.5 ${
+              !start || !end 
+                ? 'bg-slate-800/80 text-slate-500 border border-slate-700/50 cursor-not-allowed' 
+                : 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-sm border border-cyan-400/30 active:scale-[0.99]'
+            }`}
           >
-            Reset points
+            {loading ? (
+              <>
+                <Loader2 className="animate-spin w-3.5 h-3.5 text-white" />
+                <span>Computing Safe Corridor...</span>
+              </>
+            ) : (
+              <>
+                <Navigation className="w-3.5 h-3.5" />
+                <span>Calculate Safe Route</span>
+              </>
+            )}
           </button>
+
+          {/* Rainfall / Environmental Telemetry */}
+          {selectedRegion && <RainfallClock region={selectedRegion.key} />}
+
+          {/* Route Results */}
+          {routeResult && (
+            <div className="space-y-3 pt-3 border-t border-slate-800/80 animate-fade-in">
+              <div className="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800">
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <h3 className="text-base font-semibold text-slate-100">{routeResult.route.distance_km} <span className="text-xs font-normal text-slate-400">km</span></h3>
+                    <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">Calculated Distance</p>
+                  </div>
+                  <RiskBadge level={routeResult.route.max_risk_level} score={routeResult.route.safe_score} />
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-[11px] font-medium">
+                    <span className="text-slate-400">Safe corridor ratio</span>
+                    <span className="text-emerald-400 font-semibold font-mono">
+                      {Math.round((routeResult.route.risk_summary.GREEN / (routeResult.route.risk_summary.RED + routeResult.route.risk_summary.ORANGE + routeResult.route.risk_summary.GREEN)) * 100)}%
+                    </span>
+                  </div>
+                  <div className="h-1.5 flex rounded-full overflow-hidden bg-slate-800">
+                    <div className="h-full bg-emerald-500" style={{ width: `${(routeResult.route.risk_summary.GREEN / (routeResult.route.risk_summary.RED + routeResult.route.risk_summary.ORANGE + routeResult.route.risk_summary.GREEN)) * 100}%` }} />
+                    <div className="h-full bg-amber-500" style={{ width: `${(routeResult.route.risk_summary.ORANGE / (routeResult.route.risk_summary.RED + routeResult.route.risk_summary.ORANGE + routeResult.route.risk_summary.GREEN)) * 100}%` }} />
+                    <div className="h-full bg-rose-500" style={{ width: `${(routeResult.route.risk_summary.RED / (routeResult.route.risk_summary.RED + routeResult.route.risk_summary.ORANGE + routeResult.route.risk_summary.GREEN)) * 100}%` }} />
+                  </div>
+                </div>
+              </div>
+
+              {routeResult.warnings.length > 0 && (
+                <div className="bg-rose-500/10 border border-rose-500/30 p-2.5 rounded-lg space-y-1.5">
+                  {routeResult.warnings.map((w, i) => (
+                    <p key={i} className="text-[11px] text-rose-400 flex items-start gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" /> {w}
+                    </p>
+                  ))}
+                </div>
+              )}
+
+              {routeResult.runout_warnings && routeResult.runout_warnings.length > 0 && (
+                <div className="bg-rose-500/15 border border-rose-500/40 p-3 rounded-lg">
+                  <p className="text-[11px] font-semibold text-rose-400 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5" /> Active Runout Zones Detected
+                  </p>
+                  <div className="space-y-1">
+                    {routeResult.runout_warnings.map((rw, i) => (
+                      <div key={i} className="flex justify-between items-center text-[11px] text-slate-200 bg-slate-900/60 px-2 py-1 rounded">
+                        <span>{rw.km_marker}: {rw.cell_id}</span>
+                        <span className="text-rose-400 uppercase text-[9px] bg-rose-500/10 px-1.5 py-0.5 rounded font-medium">Hazard</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-rose-300/80 mt-1.5">
+                    Road segments may experience active debris runoff at these markers.
+                  </p>
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <h3 className="text-[10px] font-semibold uppercase text-slate-400 tracking-wider">Alternative Routes</h3>
+                {routeResult.alternative_routes.map((alt, i) => (
+                  <div key={i} className="bg-slate-900/60 border border-slate-800 p-2.5 rounded-lg hover:border-slate-700 cursor-pointer transition-all">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="text-xs font-semibold text-slate-200">{alt.distance_km} km</p>
+                        <p className="text-[10px] text-slate-400">+{alt.extra_time_min} min detour</p>
+                      </div>
+                      <RiskBadge level={alt.max_risk_level} className="scale-75 origin-right" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="pt-1 space-y-2">
+                <button
+                  onClick={() => startDemoSimulation(demoSpeed)}
+                  className="w-full py-2.5 rounded-lg font-semibold text-xs transition-all flex items-center justify-center gap-2 bg-gradient-to-r from-cyan-600 to-sky-600 hover:from-cyan-500 hover:to-sky-500 text-white shadow-sm active:scale-[0.99]"
+                >
+                  <Play className="w-3.5 h-3.5 fill-white" /> Start Demo Simulation ({demoSpeed}x Speed)
+                </button>
+                <button
+                  onClick={() => {
+                    setIsNavigating(true);
+                    setIsDemoMode(false);
+                    setNavIndex(0);
+                    setCarPosition({ lat: start.lat, lng: start.lng });
+                    try {
+                      localStorage.setItem('active_route', JSON.stringify(routeResult.route.segments));
+                      localStorage.setItem('cached_risk_grid', JSON.stringify(riskGrid));
+                      localStorage.setItem('cache_timestamp', new Date().toISOString());
+                    } catch (e) {
+                      console.warn('LocalStorage quota exceeded during navigation start');
+                    }
+                  }}
+                  className="w-full py-2 rounded-lg font-medium text-xs transition-all flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700/80 shadow-sm"
+                >
+                  <Navigation className="w-3.5 h-3.5 text-emerald-400" /> Start Live GPS Navigation
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="mt-auto pt-4">
+            <button
+              onClick={() => { setStart(null); setEnd(null); setRouteResult(null); setStartQuery(''); setEndQuery(''); setIsNavigating(false); setCarPosition(null); }}
+              className="text-[11px] text-slate-400 hover:text-slate-200 transition-colors block text-center mx-auto"
+            >
+              Reset waypoints
+            </button>
+          </div>
         </div>
       )}
 
@@ -717,17 +953,33 @@ const SafeRoute = () => {
               </div>
             }>
               <CesiumTerrain3DLazy
-              riskGrid={riskGrid}
-              routeResult={routeResult}
-              carPosition={carPosition}
-              start={start}
-              end={end}
-              isNavigating={isNavigating}
-              nearbyHazards={nearbyHazards}
-              liveUsers={liveUsers}
-              showEvacuation={showEvacuation}
-              satellite={false}
-            />
+                region={selectedRegion}
+                riskGrid={riskGrid}
+                routeResult={routeResult}
+                carPosition={carPosition}
+                start={start}
+                end={end}
+                isNavigating={isNavigating}
+                nearbyHazards={nearbyHazards}
+                liveUsers={liveUsers}
+                showEvacuation={showEvacuation}
+                satellite={false}
+                enableBuildings={false}
+                demoPresets={DEMO_PRESETS}
+                demoSpeed={demoSpeed}
+                onSetDemoSpeed={setDemoSpeed}
+                onLoadDemoPreset={loadDemoPreset}
+                onStartDemoSimulation={startDemoSimulation}
+                onMapClick={(loc) => {
+                  if (!start) {
+                    setStart(loc);
+                    setStartQuery(`${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}`);
+                  } else if (!end) {
+                    setEnd(loc);
+                    setEndQuery(`${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}`);
+                  }
+                }}
+              />
             </Suspense>
           ) : (
             /* ── 2D Leaflet View (unchanged) ── */
@@ -739,11 +991,136 @@ const SafeRoute = () => {
           >
             <TileLayer
               url={mapStyle === 'dark'
-                ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+                ? (import.meta.env.VITE_CARTO_API_KEY
+                    ? `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?api_key=${import.meta.env.VITE_CARTO_API_KEY}`
+                    : "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}")
                 : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               }
             />
             <MapEvents />
+
+            {/* Consolidated 2D Layers & Tools Drawer */}
+            <div className="absolute top-4 left-4 z-[1000]">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShow2DToolsDrawer(!show2DToolsDrawer);
+                }}
+                className={`px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-2 shadow-md backdrop-blur-md transition-all cursor-pointer ${
+                  show2DToolsDrawer
+                    ? 'bg-slate-800 text-white border-slate-600'
+                    : 'bg-slate-900/90 text-slate-200 border-slate-700/80 hover:bg-slate-800 hover:text-white'
+                }`}
+                title="Map Layers, Overlays and Tools"
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5 text-sky-400" />
+                <span>Layers & Tools</span>
+              </button>
+
+              {show2DToolsDrawer && (
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  className="mt-2 w-72 bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl p-3.5 space-y-3 text-slate-200 animate-in fade-in slide-in-from-top-2 duration-150"
+                >
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+                    <div className="flex items-center gap-2">
+                      <Layers className="w-4 h-4 text-sky-400" />
+                      <span className="text-xs font-semibold text-white">Map Layers & Tools</span>
+                    </div>
+                    <button 
+                      onClick={() => setShow2DToolsDrawer(false)}
+                      className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {/* Demo Corridors Section */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-cyan-300">
+                          Demo Corridors
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 bg-slate-950/80 border border-slate-700/80 rounded-md p-0.5">
+                        <button
+                          onClick={() => setDemoSpeed(4)}
+                          className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${demoSpeed === 4 ? 'bg-cyan-500 text-slate-950 font-black' : 'text-slate-400 hover:text-slate-200'}`}
+                          title="4x Real-Time Travel Speed"
+                        >
+                          4x
+                        </button>
+                        <button
+                          onClick={() => setDemoSpeed(10)}
+                          className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${demoSpeed === 10 ? 'bg-amber-400 text-slate-950 font-black' : 'text-slate-400 hover:text-slate-200'}`}
+                          title="10x Fast-Forward Presentation Speed"
+                        >
+                          10x
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      {DEMO_PRESETS.map((preset) => (
+                        <button
+                          key={preset.id}
+                          onClick={() => {
+                            loadDemoPreset(preset);
+                            setShow2DToolsDrawer(false);
+                          }}
+                          className="w-full flex items-center justify-between text-left px-2 py-1.5 rounded-lg bg-slate-950/60 hover:bg-cyan-950/40 border border-slate-800 hover:border-cyan-500/40 transition-all group cursor-pointer"
+                        >
+                          <div className="min-w-0 pr-1.5">
+                            <div className="flex items-center gap-1">
+                              <span className="text-[10px] font-medium text-slate-200 group-hover:text-cyan-300 truncate">
+                                {preset.name}
+                              </span>
+                            </div>
+                            <span className="text-[8px] text-slate-400 block truncate">{preset.desc}</span>
+                          </div>
+                          <ChevronRight className="w-3 h-3 text-slate-500 group-hover:text-cyan-400 shrink-0" />
+                        </button>
+                      ))}
+                    </div>
+
+                    {routeResult && (
+                      <button
+                        onClick={() => {
+                          startDemoSimulation(demoSpeed);
+                          setShow2DToolsDrawer(false);
+                        }}
+                        className="w-full py-1.5 rounded-lg bg-gradient-to-r from-cyan-600 to-sky-600 hover:from-cyan-500 hover:to-sky-500 text-white text-[10px] font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.99] transition-all cursor-pointer"
+                      >
+                        <Play className="w-3 h-3 fill-white" />
+                        <span>Start Demo Run ({demoSpeed}x Speed)</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Map Layer Style */}
+                  <div className="pt-2 border-t border-slate-800 space-y-1.5">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block">Map View Mode</span>
+                    <div className="grid grid-cols-3 gap-1">
+                      {[
+                        { id: 'dark', label: 'Dark' },
+                        { id: 'street', label: 'Street' },
+                        { id: '3d', label: '3D Globe' },
+                      ].map(m => (
+                        <button
+                          key={m.id}
+                          onClick={() => { setMapStyle(m.id); localStorage.setItem('lithos_mapstyle', m.id); }}
+                          className={`py-1 text-[10px] font-bold rounded border text-center transition-all ${mapStyle === m.id ? 'bg-cyan-600 text-white border-cyan-400' : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200'}`}
+                        >
+                          {m.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Locate Me Native Control */}
             <div className="absolute top-16 right-4 z-[1000]">
@@ -894,14 +1271,6 @@ const SafeRoute = () => {
             )}
 
             <MapUpdater />
-
-            {/* Instruction Overlay when not Navigating */}
-            {!isNavigating && (
-              <div className="absolute bottom-4 left-4 glass p-3 rounded-xl z-[1000] pointer-events-none">
-                <p className="text-[8px] font-black text-white/40 uppercase mb-1">Instructions</p>
-                <p className="text-[10px] font-bold">1. Enter START (Green)<br />2. Enter END (Red)<br />3. Calculate safest path</p>
-              </div>
-            )}
           </MapContainer>
           )} {/* end 2D/3D conditional */}
         </div>
@@ -950,23 +1319,129 @@ const SafeRoute = () => {
                 )}
               </div>
 
-              {/* Stop Navigation Button + Evacuation toggle */}
-              <div className="flex gap-2 mt-28 pointer-events-auto">
-                <button
-                  onClick={() => setIsNavigating(false)}
-                  className="glass px-4 py-2 rounded-xl bg-risk-red/20 text-risk-red border-risk-red/30 hover:bg-risk-red hover:text-white text-xs font-black uppercase tracking-wider transition-all"
-                >
-                  Exit Navigation
-                </button>
-                <button
-                  onClick={() => setShowEvacuation(v => !v)}
-                  className={`glass px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
-                    showEvacuation ? 'bg-risk-green/20 text-risk-green border border-risk-green/40' : 'text-white/40 border border-white/10'
-                  }`}
-                >
-                  Safe Havens
-                </button>
-              </div>
+              {/* If Demo Mode: Show Full Presentation Playback Controller */}
+              {isDemoMode && routeResult && (
+                <div className="pointer-events-auto bg-slate-950/95 border border-cyan-500/40 rounded-2xl p-3 shadow-2xl backdrop-blur-xl flex flex-col gap-2 min-w-[300px] sm:min-w-[360px] max-w-[440px] animate-fade-in">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                      <span className="text-[10px] font-black uppercase tracking-wider text-cyan-300">
+                        Demo Simulation • {demoSpeed}x Real-Time
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setDemoMuted(!demoMuted)}
+                        className={`p-1.5 rounded-lg border transition-colors ${demoMuted ? 'bg-slate-900 border-slate-700 text-slate-400 hover:text-slate-200' : 'bg-cyan-500/20 border-cyan-500 text-cyan-300'}`}
+                        title={demoMuted ? "Unmute Voice Safety Announcements" : "Mute Voice"}
+                      >
+                        {demoMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsNavigating(false);
+                          setIsDemoMode(false);
+                          setIsDemoPlaying(false);
+                          clearInterval(demoTimerRef.current);
+                        }}
+                        className="px-2 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500 text-rose-300 hover:text-white border border-rose-500/30 text-[10px] font-bold uppercase transition-all"
+                      >
+                        Exit Demo
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Waypoint Scrubber */}
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-[10px] font-mono text-slate-400">
+                      <span>Waypoint {navIndex + 1} of {routeResult.route.segments.length}</span>
+                      <span className="text-cyan-300 font-bold">
+                        {Math.round(((navIndex + 1) / routeResult.route.segments.length) * 100)}%
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={routeResult.route.segments.length - 1}
+                      value={navIndex}
+                      onChange={(e) => {
+                        const idx = parseInt(e.target.value, 10);
+                        setNavIndex(idx);
+                        const seg = routeResult.route.segments[idx];
+                        if (seg) setCarPosition({ lat: seg.lat, lng: seg.lon ?? seg.lng, risk: seg.risk_level });
+                      }}
+                      className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+                    />
+                  </div>
+
+                  {/* Playback Controls & Speed Toggle */}
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-800/80">
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setIsDemoPlaying(!isDemoPlaying)}
+                        className="px-3 py-1 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm active:scale-[0.98]"
+                      >
+                        {isDemoPlaying ? (
+                          <>
+                            <Pause className="w-3 h-3 fill-slate-950" /> Pause
+                          </>
+                        ) : (
+                          <>
+                            <Play className="w-3 h-3 fill-slate-950" /> Play
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setNavIndex(0);
+                          const seg = routeResult.route.segments[0];
+                          if (seg) setCarPosition({ lat: seg.lat, lng: seg.lon ?? seg.lng, risk: seg.risk_level });
+                          setIsDemoPlaying(true);
+                        }}
+                        className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700/80 transition-colors"
+                        title="Restart from origin"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-1 bg-slate-900 border border-slate-700/80 rounded-lg p-0.5">
+                      <button
+                        onClick={() => setDemoSpeed(4)}
+                        className={`px-2 py-0.5 text-[10px] font-bold rounded-md transition-colors ${demoSpeed === 4 ? 'bg-cyan-500 text-slate-950 font-black' : 'text-slate-400 hover:text-slate-200'}`}
+                      >
+                        4x Speed
+                      </button>
+                      <button
+                        onClick={() => setDemoSpeed(10)}
+                        className={`px-2 py-0.5 text-[10px] font-bold rounded-md transition-colors ${demoSpeed === 10 ? 'bg-amber-400 text-slate-950 font-black' : 'text-slate-400 hover:text-slate-200'}`}
+                      >
+                        10x Turbo
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Standard Navigation Exit & Havens if NOT in Demo Mode */}
+              {!isDemoMode && (
+                <div className="flex gap-2 mt-28 pointer-events-auto">
+                  <button
+                    onClick={() => setIsNavigating(false)}
+                    className="glass px-4 py-2 rounded-xl bg-risk-red/20 text-risk-red border-risk-red/30 hover:bg-risk-red hover:text-white text-xs font-black uppercase tracking-wider transition-all"
+                  >
+                    Exit Navigation
+                  </button>
+                  <button
+                    onClick={() => setShowEvacuation(v => !v)}
+                    className={`glass px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
+                      showEvacuation ? 'bg-risk-green/20 text-risk-green border border-risk-green/40' : 'text-white/40 border border-white/10'
+                    }`}
+                  >
+                    Safe Havens
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Live Reporting Popups */}
