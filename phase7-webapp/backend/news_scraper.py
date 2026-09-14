@@ -6,10 +6,10 @@ from datetime import datetime
 import json
 import uuid
 
-import mock_data
 import os
 
 SEEN_TITLES_FILE = "seen_titles.json"
+import mock_data
 
 def load_seen_titles():
     if os.path.exists(SEEN_TITLES_FILE):

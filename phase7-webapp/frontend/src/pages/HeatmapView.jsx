@@ -211,7 +211,7 @@ const HeatmapView = () => {
               onClick={() => setViewDimension('3d')}
               className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 ${
                 viewDimension === '3d'
-                  ? 'bg-gradient-to-r from-red-600 via-orange-500 to-amber-500 text-white shadow-[0_0_15px_rgba(239,68,68,0.5)]'
+                  ? 'bg-accent text-bg shadow-[0_0_15px_rgba(43,158,255,0.5)] font-black'
                   : 'text-white/60 hover:text-white hover:bg-white/5'
               }`}
               title="Continuous 3D Surface Elevation Mesh with Topographic Contours"

@@ -10,7 +10,6 @@ class GEEService:
     def __init__(self):
         self.initialized = False
         self.project_id = "sougata-489719"
-        self._initialize()
 
     def _initialize(self):
         """Authenticates with GEE using Service Account JSON."""

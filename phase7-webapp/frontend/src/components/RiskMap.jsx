@@ -31,7 +31,7 @@ const RiskMap = ({ region, riskData, reports, onCellClick, activeRunout, globalR
         // Placeholder for SAR WMS or different tile
         return 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'; 
       default:
-        return 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+        return 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}';
     }
   };
 
@@ -42,11 +42,15 @@ const RiskMap = ({ region, riskData, reports, onCellClick, activeRunout, globalR
     YELLOW: '#FFD60A'
   };
 
+  const mapCenter = region?.center || [27.33, 88.61];
+
   return (
     <div className="w-full h-full relative z-0">
       <MapContainer 
-        center={region.center} 
+        key={region?.key || 'risk-map-2d'}
+        center={mapCenter} 
         zoom={12} 
+        preferCanvas={true}
         className="w-full h-full"
         zoomControl={false}
       >
@@ -55,15 +59,15 @@ const RiskMap = ({ region, riskData, reports, onCellClick, activeRunout, globalR
           url={getTileLayer()}
         />
         
-        <MapAutoZoom center={region.center} />
+        <MapAutoZoom center={mapCenter} />
 
         {showGrid && riskData && (
           <GeoJSON 
-            key={riskData.region} // Force re-render on region change
+            key={`${region?.key || 'risk'}-${riskData?.features?.length || 0}`}
             data={riskData}
             style={(feature) => {
-              const level = feature.properties.risk_level;
-              const cellId = feature.properties.cell_id;
+              const level = feature?.properties?.risk_level;
+              const cellId = feature?.properties?.cell_id;
               
               // Highlight selected failing cell
               const isSelected = activeRunout && activeRunout.source_cell_id === cellId;
@@ -73,10 +77,10 @@ const RiskMap = ({ region, riskData, reports, onCellClick, activeRunout, globalR
               const isAffectedRoad = activeRunout?.impacts?.road_risk_cells?.some(c => c.cell_id === cellId);
               
               return {
-                color: isSelected ? '#FFFFFF' : (isAffectedChain || isAffectedRoad) ? '#FF9500' : 'rgba(255,255,255,0.15)',
+                color: isSelected ? '#FFFFFF' : (isAffectedChain || isAffectedRoad) ? '#FF9500' : level === 'RED' ? '#FF3B30' : 'rgba(255,255,255,0.08)',
                 fillColor: riskColors[level] || '#30D158',
-                fillOpacity: level === 'RED' ? 0.45 : level === 'ORANGE' ? 0.3 : 0.1,
-                weight: isSelected ? 3 : (isAffectedChain || isAffectedRoad) ? 2 : 0.5,
+                fillOpacity: level === 'RED' ? 0.55 : level === 'ORANGE' ? 0.35 : 0.08,
+                weight: isSelected ? 3 : (isAffectedChain || isAffectedRoad) ? 2 : level === 'RED' ? 1.5 : 0.2,
                 dashArray: isAffectedChain ? '5, 5' : '',
                 interactive: true,
               };
@@ -86,7 +90,7 @@ const RiskMap = ({ region, riskData, reports, onCellClick, activeRunout, globalR
                 click: (e) => {
                   e.originalEvent._handledByFeature = true;
                   L.DomEvent.stopPropagation(e);
-                  onCellClick(feature.properties);
+                  if (onCellClick && feature?.properties) onCellClick(feature.properties);
                 }
               });
             }}
@@ -95,33 +99,72 @@ const RiskMap = ({ region, riskData, reports, onCellClick, activeRunout, globalR
 
         <MapEvents onMapClick={onMapClick} />
 
-        {/* --- GLOBAL RUNOUT OVERLAY (Influence areas for all failing slopes) --- */}
-        {!activeRunout && globalRunouts && globalRunouts.map(fan => (
-          <Polygon 
-            key={`global-fan-${fan.cell_id}`}
-            positions={fan.fan_polygon.coordinates[0].map(c => [c[1], c[0]])}
-            pathOptions={{
-              fillColor: '#FF3B30',
-              fillOpacity: 0.1,
-              color: '#FF3B30',
-              weight: 1.5,
-              dashArray: '4, 2',
-              interactive: false
-            }}
-          />
-        ))}
+        {/* --- GLOBAL RUNOUT OVERLAY (Active debris runout fans across region) --- */}
+        {!activeRunout && globalRunouts && globalRunouts.map(fan => {
+          const coords = fan?.fan_polygon?.coordinates?.[0];
+          if (!coords || !Array.isArray(coords) || coords.length < 3) return null;
+          return (
+            <React.Fragment key={`global-fan-${fan.cell_id}`}>
+              <Polygon 
+                positions={coords.map(c => [c[1], c[0]])}
+                pathOptions={{
+                  fillColor: '#FF3B30',
+                  fillOpacity: 0.3,
+                  color: '#FF3B30',
+                  weight: 2,
+                  dashArray: '5, 3',
+                  interactive: true
+                }}
+              >
+                <Popup className="glass-popup">
+                  <div className="p-2 text-white min-w-[180px]">
+                    <div className="flex items-center gap-1.5 text-xs font-black text-red-400 mb-1">
+                      <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+                      ACTIVE DEBRIS RUNOUT FAN
+                    </div>
+                    <div className="text-[11px] text-white/80 space-y-0.5">
+                      <p><strong>Slope ID:</strong> {fan.cell_id}</p>
+                      <p><strong>FoS (Seismic):</strong> <span className="text-red-400 font-bold">{fan.fos_seismic ? Number(fan.fos_seismic).toFixed(2) : '< 1.0'}</span></p>
+                      <p><strong>Runout Reach:</strong> {fan.runout_m ? `${Math.round(fan.runout_m)} m` : 'N/A'}</p>
+                      {fan.debris_volume_m3 && <p><strong>Volume:</strong> {Math.round(fan.debris_volume_m3).toLocaleString()} m³</p>}
+                    </div>
+                  </div>
+                </Popup>
+              </Polygon>
+              {fan.center_lat && fan.center_lon && (
+                <Circle
+                  center={[fan.center_lat, fan.center_lon]}
+                  radius={70}
+                  pathOptions={{
+                    fillColor: '#FF3B30',
+                    fillOpacity: 0.9,
+                    color: '#FFFFFF',
+                    weight: 2
+                  }}
+                >
+                  <Popup>
+                    <div className="text-xs font-bold text-red-400">
+                      Rupture Source: {fan.cell_id}
+                    </div>
+                  </Popup>
+                </Circle>
+              )}
+            </React.Fragment>
+          );
+        })}
 
         {/* --- HIGH FIDELITY RUNOUT VISUALIZATION (Option B - Selected Cell) --- */}
-        {activeRunout && (
+        {activeRunout && activeRunout.fan_polygon?.coordinates?.[0] && (
           <>
             {activeRunout.aspect_known ? (
               // Option A+B: Heatmap Fan
               [1.0, 0.75, 0.5, 0.25].map((scale, idx) => {
                 const colors = ['#FFFF00', '#FF9500', '#FF3B30', '#8B0000'];
-                const opacities = [0.15, 0.25, 0.4, 0.6];
+                const opacities = [0.2, 0.35, 0.5, 0.7];
                 
                 // Scale the fan coordinates for gradient effect
                 const baseCoords = activeRunout.fan_polygon.coordinates[0];
+                if (!baseCoords || baseCoords.length < 3) return null;
                 const apex = baseCoords[0];
                 const scaledCoords = baseCoords.map(pt => {
                   const dx = pt[0] - apex[0];
@@ -136,8 +179,8 @@ const RiskMap = ({ region, riskData, reports, onCellClick, activeRunout, globalR
                     pathOptions={{
                       fillColor: colors[idx],
                       fillOpacity: opacities[idx],
-                      color: 'transparent',
-                      weight: 0,
+                      color: idx === 0 ? '#FF3B30' : 'transparent',
+                      weight: idx === 0 ? 2 : 0,
                       interactive: false
                     }}
                   />
@@ -147,14 +190,18 @@ const RiskMap = ({ region, riskData, reports, onCellClick, activeRunout, globalR
               // Circle Fallback for unknown aspect
               [1.0, 0.75, 0.5, 0.25].map((scale, idx) => {
                 const colors = ['#FFFF00', '#FF9500', '#FF3B30', '#8B0000'];
+                const centerPt = [
+                  activeRunout.center_lat || activeRunout.fan_polygon.coordinates[0][0][1], 
+                  activeRunout.center_lon || activeRunout.fan_polygon.coordinates[0][0][0]
+                ];
                 return (
                   <Circle
                     key={`circle-${idx}`}
-                    center={[activeRunout.center_lat || activeRunout.fan_polygon.coordinates[0][0][1], activeRunout.center_lon || activeRunout.fan_polygon.coordinates[0][0][0]]}
-                    radius={activeRunout.runout_distance_m * scale}
+                    center={centerPt}
+                    radius={(activeRunout.runout_distance_m || 500) * scale}
                     pathOptions={{
                       fillColor: colors[idx],
-                      fillOpacity: 0.2,
+                      fillOpacity: 0.25,
                       color: 'transparent',
                       weight: 0,
                       interactive: false

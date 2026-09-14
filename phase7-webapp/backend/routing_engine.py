@@ -28,31 +28,45 @@ ACTIVE_RUNOUT_FANS: List[Dict] = []
 
 def initialize_runout_fans():
     """
-    Called at startup. Pre-calculates runout fans for all failing slopes
-    so the routing engine can immediately avoid them.
+    Called at startup. Pre-calculates runout fans for failing slopes
+    across ALL regions so the routing engine and 2D/3D maps can display and avoid them.
     """
     global ACTIVE_RUNOUT_FANS
     ACTIVE_RUNOUT_FANS.clear()
     
-    failing_cells = sorted([c for c in ALL_CELLS_FLAT if c.get("fos_seismic", 4.0) < 1.0], key=lambda x: x.get("fos_seismic", 1.0))[:30]
-    print(f"[Routing] Pre-calculating top {len(failing_cells)} critical runout zones for instant startup...")
-    
-    for cell in failing_cells:
+    # Pre-calculate top failing cells per region
+    selected_cells = []
+    for reg_key, reg_cells in CELLS.items():
+        # Sort cells in this region by fos_seismic ascending
+        sorted_cells = sorted(reg_cells, key=lambda c: c.get("fos_seismic", 4.0))
+        # Take cells with FoS < 1.05 or the top 6 lowest FoS cells
+        failing = [c for c in sorted_cells if c.get("fos_seismic", 4.0) < 1.05][:6]
+        if not failing:
+            failing = sorted_cells[:4]  # fallback to most critical in that region
+        selected_cells.extend(failing)
+
+    print(f"[Routing] Pre-calculating {len(selected_cells)} runout zones across {len(CELLS)} regions...")
+    for cell in selected_cells:
         try:
-            # Re-use the engine's calculation logic
             res = runout_engine.estimate_runout(cell, ALL_CELLS_FLAT)
+            reg_name = cell.get("region") or cell["cell_id"].rsplit("_", 1)[0]
             ACTIVE_RUNOUT_FANS.append({
                 "cell_id": cell["cell_id"],
+                "region": reg_name,
                 "center_lat": cell["center_lat"],
                 "center_lon": cell["center_lon"],
                 "runout_m": res["runout_distance_m"],
                 "aspect_deg": res["aspect_deg"],
-                "fan_polygon": res["fan_polygon"]
+                "aspect_known": res.get("aspect_known", True),
+                "fan_polygon": res["fan_polygon"],
+                "fos_seismic": cell.get("fos_seismic"),
+                "slope_mean": cell.get("slope_mean"),
+                "debris_volume_m3": res.get("debris_volume_m3")
             })
         except Exception as e:
-            print(f"[Routing] Failed to build fan for {cell['cell_id']}: {e}")
-    
-    print(f"[Routing] {len(ACTIVE_RUNOUT_FANS)} active fans cached.")
+            print(f"[Routing] Failed to build fan for {cell.get('cell_id')}: {e}")
+
+    print(f"[Routing] {len(ACTIVE_RUNOUT_FANS)} active debris runout fans cached across all regions.")
 
 
 def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:

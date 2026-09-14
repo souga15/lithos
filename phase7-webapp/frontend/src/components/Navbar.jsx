@@ -16,7 +16,6 @@ const Navbar = ({ alertCount, isOffline }) => {
   const navItems = [
     { name: 'Home',            path: '/'         },
     { name: 'Dashboard',       path: '/dashboard' },
-    { name: '3D Heatmap',      path: '/heatmap'   },
     { name: 'Safe Route',      path: '/route'     },
     { name: 'Forecast',        path: '/forecast'  },
     { name: 'Alerts',          path: '/alerts',  badge: alertCount },

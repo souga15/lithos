@@ -36,8 +36,8 @@ const Home = ({ setAlertCount }) => {
   const [weather, setWeather] = useState(null);
   const [reports, setReports] = useState([]);
   const [activeAlert, setActiveAlert] = useState(null);
+  const [mapMode, setMapMode] = useState('3d-cesium'); // Default: 3D Heatmap on home screen
   const [layerType, setLayerType] = useState('street');
-  const [mapMode, setMapMode] = useState('2d'); // '2d' | '3d-cesium' | '3d-mesh'
   const [selectedCell, setSelectedCell] = useState(null);
   const [activeRunout, setActiveRunout] = useState(null);
   const [globalRunouts, setGlobalRunouts] = useState([]);
@@ -86,6 +86,7 @@ const Home = ({ setAlertCount }) => {
 
   const handleIntroSelect = (region) => {
     setSelectedRegion(region);
+    setMapMode('3d-cesium');
     setShowIntro(false);
     setShowScanner(true); // trigger scan animation
   };
@@ -229,7 +230,7 @@ const Home = ({ setAlertCount }) => {
               onClick={() => setMapMode('2d')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                 mapMode === '2d'
-                  ? 'bg-white/20 text-white shadow-sm border border-white/30'
+                  ? 'bg-accent text-bg shadow-[0_0_15px_rgba(43,158,255,0.6)] font-black'
                   : 'text-white/60 hover:text-white hover:bg-white/5'
               }`}
             >
@@ -239,19 +240,19 @@ const Home = ({ setAlertCount }) => {
 
             <button
               onClick={() => setMapMode('3d-cesium')}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${
                 mapMode === '3d-cesium'
-                  ? 'bg-gradient-to-r from-red-600 via-orange-500 to-amber-500 text-white shadow-[0_0_15px_rgba(239,68,68,0.6)]'
+                  ? 'bg-accent text-bg shadow-[0_0_15px_rgba(43,158,255,0.6)] font-black'
                   : 'text-white/60 hover:text-white hover:bg-white/5'
               }`}
             >
-              <Globe className="w-3.5 h-3.5 text-amber-300" />
+              <Globe className="w-3.5 h-3.5" />
               <span>3D PINN HEATMAP</span>
             </button>
 
             <button
               onClick={() => setMapMode('3d-mesh')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
                 mapMode === '3d-mesh'
                   ? 'bg-accent text-bg shadow-[0_0_15px_rgba(43,158,255,0.6)] font-black'
                   : 'text-white/60 hover:text-white hover:bg-white/5'

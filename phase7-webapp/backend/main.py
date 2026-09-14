@@ -2,19 +2,29 @@
 LITHOS Phase 7 — FastAPI Backend
 All REST endpoints + WebSocket alert streams.
 """
+import os
 import asyncio
 import json
 import random
 import math
+import logging
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Dict, Any
 from contextlib import asynccontextmanager
 import uuid
 import sys
+from io import BytesIO
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query
+import numpy as np
+from scipy.interpolate import griddata
+from PIL import Image as PILImage, ImageDraw, ImageFilter
+
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+logger = logging.getLogger("lithos-api")
+
 
 from mock_data import (
     ALL_REGIONS, CELLS, ALERTS, REPORTS, FORECASTS, FRESHNESS,
@@ -37,6 +47,7 @@ import torch
 
 from mock_data import ALL_REPORTS
 
+@asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize runout fans for routing engine
     from routing_engine import initialize_runout_fans
@@ -117,31 +128,31 @@ _WS_EVENTS = [
     },
     {
         "type": "weather_alert",
-        "region": "wayanad",
-        "message": "Intense rainfall detected (42mm/hr). Please drive safely and maintain visibility.",
+        "region": "assam_hills",
+        "message": "Intense rainfall detected in Dima Hasao (42mm/hr). Please drive safely and maintain visibility.",
         "rainfall_1h": 42.1, "risk_change": "ORANGE → RED",
     },
     {
         "type": "risk_alert",
         "region": "sikkim", "cell_id": 117,
         "risk_level": "RED", "risk_score": 0.87,
-        "message": "Unstable terrain detected ahead. High caution advised.",
+        "message": "Unstable terrain detected ahead on NH10. High caution advised.",
         "coordinates": [27.55, 88.45], "rainfall_24h": 143.0,
         "top_factor": "deformation_proxy",
     },
     {
         "type": "community_report",
-        "report_id": "rpt_live_002", "region": "wayanad",
-        "lat": 11.65, "lon": 75.88,
+        "report_id": "rpt_live_002", "region": "nagaland",
+        "lat": 25.67, "lon": 94.11,
         "report_type": "active_landslide", "severity": "life_threatening",
         "confirm_count": 3, "verified": True,
-        "message": "Community report: Landslide on Kalpetta–Mananthavady road. Consider alternative routes.",
+        "message": "Community report: Mudslide on Kohima–Dimapur bypass. Consider alternative routes.",
         "distance_km": 4.1,
     },
     {
         "type": "weather_alert",
-        "region": "idukki",
-        "message": "72hr cumulative rainfall: 389mm — extreme saturation",
+        "region": "arunachal_w",
+        "message": "72hr cumulative rainfall: 389mm — extreme saturation in West Kameng corridor",
         "rainfall_1h": 28.5, "risk_change": "ORANGE → RED",
     },
 ]
@@ -472,9 +483,9 @@ def get_heatmap_image(region: str = Query("sikkim"), mode: str = Query("slope_un
         glon, glat = np.meshgrid(grid_lon, grid_lat)
 
         try:
-            grid_risk = griddata((lons, lats), scores, (glon, glat), method='cubic', fill_value=np.nan)
-        except Exception:
             grid_risk = griddata((lons, lats), scores, (glon, glat), method='linear', fill_value=np.nan)
+        except Exception:
+            grid_risk = griddata((lons, lats), scores, (glon, glat), method='nearest')
 
         nan_mask = np.isnan(grid_risk)
         if nan_mask.any():
@@ -522,10 +533,36 @@ def get_heatmap_image(region: str = Query("sikkim"), mode: str = Query("slope_un
         rgba[m4, 3] = (215 + t4 * 20).astype(np.uint8)
 
         final_img = PILImage.fromarray(rgba, 'RGBA')
+        final_img = final_img.filter(ImageFilter.GaussianBlur(radius=2.0))
+
+    # Mask heatmap image strictly to official state boundary polygon so zero pixels bleed outside
+    boundary_file = os.path.join(os.path.dirname(__file__), "data", "ne_state_boundaries.json")
+    if os.path.exists(boundary_file):
+        try:
+            with open(boundary_file, 'r', encoding='utf-8') as bf:
+                boundaries = json.load(bf)
+            if region in boundaries:
+                coords = boundaries[region]
+                poly_px = [
+                    (int((lon - west) / (east - west) * (res - 1)),
+                     int((north - lat) / (north - south) * (res - 1)))
+                    for lon, lat in coords
+                ]
+                if len(poly_px) >= 3:
+                    mask = PILImage.new('L', (res, res), 0)
+                    mask_draw = ImageDraw.Draw(mask)
+                    mask_draw.polygon(poly_px, fill=255)
+                    mask = mask.filter(ImageFilter.GaussianBlur(radius=0.5))
+                    r, g, b, a = final_img.split()
+                    a = PILImage.composite(a, PILImage.new('L', (res, res), 0), mask)
+                    final_img = PILImage.merge('RGBA', (r, g, b, a))
+        except Exception as e:
+            logger.warning(f"Failed to mask heatmap to boundary for {region}: {e}")
 
     buf = BytesIO()
     final_img.save(buf, format='PNG', optimize=True)
     buf.seek(0)
+
 
     return Response(
         content=buf.read(),
@@ -745,9 +782,13 @@ def proximity_alerts(lat: float, lon: float, radius: float = 6.0):
 def get_active_runouts(region: Optional[str] = None):
     """Return all pre-calculated runout fans (global or for a specific region)."""
     from routing_engine import ACTIVE_RUNOUT_FANS
-    if region:
-        # Extract region prefix from cell_id (e.g. 'cherrapunji_0042' -> 'cherrapunji')
-        return [f for f in ACTIVE_RUNOUT_FANS if f["cell_id"].startswith(region)]
+    if region and region.lower() != "all":
+        reg_clean = region.strip().lower()
+        matched = [
+            f for f in ACTIVE_RUNOUT_FANS 
+            if f.get("region") == reg_clean or f["cell_id"].lower().startswith(reg_clean)
+        ]
+        return matched
     return ACTIVE_RUNOUT_FANS
 
 
@@ -1006,6 +1047,7 @@ def get_3d_heatmap_mesh(region: str = Query(default="sikkim"), grid_res: int = Q
     from mock_data import _PINN, _SLOPE_UNITS_GDF
 
     reg = ALL_REGIONS.get(region, ALL_REGIONS["sikkim"])
+    csv_region = reg.get("csv_region")
     bbox = reg.get("bbox")
     if bbox:
         w_w, w_s, w_e, w_n = bbox
@@ -1014,24 +1056,33 @@ def get_3d_heatmap_mesh(region: str = Query(default="sikkim"), grid_res: int = Q
         d_lat, d_lon = 0.55, 0.55
         w_s, w_n = c_lat - d_lat, c_lat + d_lat
         w_w, w_e = c_lon - d_lon, c_lon + d_lon
-    
-    lon_vec = np.linspace(w_w, w_e, grid_res)
-    lat_vec = np.linspace(w_s, w_n, grid_res)
-    lon_mesh, lat_mesh = np.meshgrid(lon_vec, lat_vec)
 
     enriched_df = _get_enriched_df()
     used_enriched = False
     
     if enriched_df is not None:
-        sub = enriched_df[
-            (enriched_df.center_lat >= w_s) & (enriched_df.center_lat <= w_n) &
-            (enriched_df.center_lon >= w_w) & (enriched_df.center_lon <= w_e)
-        ]
+        if csv_region and "region" in enriched_df.columns:
+            sub = enriched_df[enriched_df["region"] == csv_region]
+        else:
+            sub = enriched_df[
+                (enriched_df.center_lat >= w_s) & (enriched_df.center_lat <= w_n) &
+                (enriched_df.center_lon >= w_w) & (enriched_df.center_lon <= w_e)
+            ]
         if len(sub) >= 10:
             used_enriched = True
-            pts = np.column_stack([sub["center_lon"].to_numpy(), sub["center_lat"].to_numpy()])
-            elev_pts = sub["elevation_m"].to_numpy()
-            probs = sub["pred_probability"].to_numpy()
+            w_w = float(sub["center_lon"].min())
+            w_e = float(sub["center_lon"].max())
+            w_s = float(sub["center_lat"].min())
+            w_n = float(sub["center_lat"].max())
+
+            lon_vec = np.linspace(w_w, w_e, grid_res)
+            lat_vec = np.linspace(w_s, w_n, grid_res)
+            lon_mesh, lat_mesh = np.meshgrid(lon_vec, lat_vec)
+
+            sample_sub = sub if len(sub) <= 15000 else sub.sample(15000, random_state=42)
+            pts = np.column_stack([sample_sub["center_lon"].to_numpy(), sample_sub["center_lat"].to_numpy()])
+            elev_pts = sample_sub["elevation_m"].to_numpy()
+            probs = sample_sub["pred_probability"].to_numpy()
             
             z_grid = griddata(pts, elev_pts, (lon_mesh, lat_mesh), method='linear')
             nan_m = np.isnan(z_grid)
@@ -1044,6 +1095,9 @@ def get_3d_heatmap_mesh(region: str = Query(default="sikkim"), grid_res: int = Q
                 risk_grid[nan_r] = griddata(pts, probs, (lon_mesh[nan_r], lat_mesh[nan_r]), method='nearest')
 
     if not used_enriched:
+        lon_vec = np.linspace(w_w, w_e, grid_res)
+        lat_vec = np.linspace(w_s, w_n, grid_res)
+        lon_mesh, lat_mesh = np.meshgrid(lon_vec, lat_vec)
         df = _SLOPE_UNITS_GDF[_SLOPE_UNITS_GDF["region"] == region] if _SLOPE_UNITS_GDF is not None else None
         if df is not None and not df.empty:
             pts = np.column_stack([df["center_lon"].to_numpy(), df["center_lat"].to_numpy()])

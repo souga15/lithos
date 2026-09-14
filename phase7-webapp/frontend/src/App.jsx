@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AlertTriangle } from 'lucide-react';
 
 // Lazy load ALL pages so a single broken import doesn't crash the whole app
@@ -134,11 +134,7 @@ function App() {
                     <SafeRoute />
                   </ErrorBoundary>
                 } />
-                <Route path="/heatmap" element={
-                  <ErrorBoundary name="Heatmap Swipe View">
-                    <HeatmapView />
-                  </ErrorBoundary>
-                } />
+                <Route path="/heatmap" element={<Navigate to="/" replace />} />
                 <Route path="/forecast" element={
                   <ErrorBoundary name="Forecast Page">
                     <Forecast />

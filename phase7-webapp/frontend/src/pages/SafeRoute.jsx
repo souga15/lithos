@@ -1,5 +1,6 @@
 import React, { useState, useEffect, Suspense } from 'react';
-import { MapContainer, TileLayer, Polyline, Marker, Popup, useMapEvents, GeoJSON } from 'react-leaflet';
+import { MapContainer, TileLayer, Polyline, Marker, Popup, useMapEvents, GeoJSON, Polygon, useMap } from 'react-leaflet';
+import HeatmapLayer from '../components/HeatmapLayer';
 import { Route as RouteIcon, AlertTriangle, Search, Navigation, Map as MapIcon, Layers, Globe, Loader2, MapPin, X, ArrowUpDown, Play, Pause, RotateCcw, Volume2, VolumeX, Sparkles, ChevronRight, Compass, Gauge, SlidersHorizontal } from 'lucide-react';
 import L from 'leaflet';
 import axios from 'axios';
@@ -35,15 +36,15 @@ const DEMO_PRESETS = [
     endLabel: 'Sohra Eco Park',
   },
   {
-    id: 'wayanad-ghat',
-    name: 'Western Ghats: Kalpetta ➔ Vythiri Pass',
-    badge: 'Steep Ghat Road',
-    regionKey: 'wayanad',
-    desc: 'Vulnerable Western Ghats mountain road prone to monsoon debris runoff',
-    start: { lat: 11.6094, lng: 76.0827 },
-    startLabel: 'Kalpetta Junction',
-    end: { lat: 11.5510, lng: 76.0410 },
-    endLabel: 'Vythiri Ghat Pass',
+    id: 'manipur-nh2',
+    name: 'Manipur NH-2: Imphal ➔ Kohima Corridor',
+    badge: 'Tectonic Ridge Highway',
+    regionKey: 'manipur_nh2',
+    desc: 'Critical lifeline corridor crossing fault zones with active seismic slope screening',
+    start: { lat: 24.8170, lng: 93.9368 },
+    startLabel: 'Imphal Capital Gate',
+    end: { lat: 25.6701, lng: 94.1077 },
+    endLabel: 'Kohima Highway Post',
   },
 ];
 
@@ -76,6 +77,7 @@ const SafeRoute = () => {
   const [routeResult, setRouteResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [riskGrid, setRiskGrid] = useState(null);
+  const [activeRunouts, setActiveRunouts] = useState([]);
 
   // Live Navigation Data State
   const [weather, setWeather] = useState(null);
@@ -97,7 +99,7 @@ const SafeRoute = () => {
   const lastProximityCheck = React.useRef({ lat: 0, lng: 0, time: 0 });
   const lastAlertedHazard = React.useRef(null);
   const [showCertificate, setShowCertificate] = useState(false);
-  const [mapStyle, setMapStyle]       = useState(() => localStorage.getItem('lithos_mapstyle') || 'street');
+  const [mapStyle, setMapStyle]       = useState(() => localStorage.getItem('lithos_mapstyle') || '3d');
   const [nearbyHazards, setNearbyHazards] = useState([]);
   const [liveUsers,    setLiveUsers]   = useState([]);
   const [showEvacuation, setShowEvacuation] = useState(false);
@@ -159,20 +161,13 @@ const SafeRoute = () => {
     return () => window.speechSynthesis.cancel();
   }, []);
 
-  // Reset map state only when the region changes
+  // Load risk grid and active runout zones whenever the region changes
   useEffect(() => {
-    if (selectedRegion && regions.length > 0) {
-      fetchRiskGrid(regions);
-      setStart(null);
-      setEnd(null);
-      setRouteResult(null);
-      setStartQuery('');
-      setEndQuery('');
-      setIsNavigating(false);
-      setCarPosition(null);
-      setShowCertificate(false);
+    if (selectedRegion?.key) {
+      fetchRiskGrid(selectedRegion);
+      fetchActiveRunouts(selectedRegion.key);
     }
-  }, [selectedRegion?.key, regions]); // intentionally not observing isOffline to prevent reset on reconnection
+  }, [selectedRegion?.key]);
 
   // Fetch weather separately when region changes or connection returns
   useEffect(() => {
@@ -312,56 +307,27 @@ const SafeRoute = () => {
     }
   };
 
-  const fetchRiskGrid = async (allRegions) => {
+  const fetchRiskGrid = async (targetRegion) => {
+    const reg = targetRegion || selectedRegion;
+    if (!reg?.key) return;
     try {
-      if (!allRegions || allRegions.length === 0) return;
-
-      // ── Phase 1: Load selected region immediately so map is usable right away
-      const primaryRegion = selectedRegion || allRegions[0];
-      try {
-        const resp = await axios.get(`${API_BASE_URL}/api/risk-grid?region=${primaryRegion.key}`);
-        if (resp.data.features) {
-          setRiskGrid({
-            type: 'FeatureCollection',
-            features: resp.data.features,
-          });
-        }
-      } catch (e) {
-        const cached = localStorage.getItem('grid_cache_global');
-        if (cached) setRiskGrid(JSON.parse(cached));
+      const resp = await axios.get(`${API_BASE_URL}/api/risk-grid?region=${reg.key}`);
+      if (resp.data && resp.data.features) {
+        setRiskGrid(resp.data);
       }
+    } catch (e) {
+      console.warn("Failed to load risk grid for region:", reg.key, e);
+    }
+  };
 
-      // ── Phase 2: Fetch all other regions in parallel in the background
-      const remainingRegions = allRegions.filter(r => r.key !== primaryRegion.key);
-      if (remainingRegions.length === 0) return;
-
-      const results = await Promise.allSettled(
-        remainingRegions.map(reg =>
-          axios.get(`${API_BASE_URL}/api/risk-grid?region=${reg.key}`)
-            .then(r => r.data.features || [])
-            .catch(() => [])
-        )
-      );
-
-      const extraFeatures = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
-      if (extraFeatures.length === 0) return;
-
-      setRiskGrid(prev => {
-        const combined = {
-          type: 'FeatureCollection',
-          features: [...(prev?.features || []), ...extraFeatures],
-        };
-        try {
-          localStorage.setItem('grid_cache_global', JSON.stringify(combined));
-        } catch (e) {
-          console.warn('LocalStorage quota exceeded for grid_cache_global');
-        }
-        return combined;
-      });
-
-    } catch (err) {
-      const cached = localStorage.getItem('grid_cache_global');
-      if (cached) setRiskGrid(JSON.parse(cached));
+  const fetchActiveRunouts = async (regionKey) => {
+    if (!regionKey) return;
+    try {
+      const resp = await axios.get(`${API_BASE_URL}/api/active-runouts?region=${regionKey}`);
+      setActiveRunouts(resp.data || []);
+    } catch (e) {
+      console.warn("Failed to load active runouts for region:", regionKey, e);
+      setActiveRunouts([]);
     }
   };
 
@@ -647,10 +613,18 @@ const SafeRoute = () => {
     useEffect(() => {
       if (isNavigating && carPosition) {
         map.panTo([carPosition.lat, carPosition.lng], { animate: true, duration: 0.8 });
-      } else if (!isNavigating && routeResult) {
+      } else if (!isNavigating && routeResult?.route?.segments?.length) {
         // Fit bounds to route
-        const bounds = routeResult.route.segments.map(s => [s.lat, s.lon]);
-        if (bounds.length > 0) map.fitBounds(bounds, { padding: [50, 50] });
+        const bounds = routeResult.route.segments
+          .filter(s => s && s.lat != null && (s.lon != null || s.lng != null))
+          .map(s => [s.lat, s.lon ?? s.lng]);
+        if (bounds.length > 0) {
+          try {
+            map.fitBounds(bounds, { padding: [50, 50] });
+          } catch (e) {
+            console.warn("FitBounds failed:", e);
+          }
+        }
       } else if (focusPoint) {
         map.flyTo([focusPoint.lat, focusPoint.lng], 14, { animate: true, duration: 1 });
         setFocusPoint(null);
@@ -690,7 +664,20 @@ const SafeRoute = () => {
                 <select
                   className="w-full bg-transparent text-xs font-medium text-slate-200 outline-none cursor-pointer"
                   value={selectedRegion?.key}
-                  onChange={(e) => setSelectedRegion(regions.find(r => r.key === e.target.value))}
+                  onChange={(e) => {
+                    const reg = regions.find(r => r.key === e.target.value);
+                    if (reg) {
+                      setSelectedRegion(reg);
+                      setStart(null);
+                      setEnd(null);
+                      setRouteResult(null);
+                      setStartQuery('');
+                      setEndQuery('');
+                      setIsNavigating(false);
+                      setCarPosition(null);
+                      setShowCertificate(false);
+                    }
+                  }}
                 >
                   {regions.map(r => <option key={r.key} value={r.key} className="bg-slate-900 text-slate-100">{r.name}</option>)}
                 </select>
@@ -942,6 +929,56 @@ const SafeRoute = () => {
 
       {/* Map View */}
       <div className="flex-grow h-full relative w-full transition-all duration-500">
+        {/* Floating Map Style Switcher (visible in both 2D and 3D) */}
+        <div className="absolute top-4 right-4 z-30 pointer-events-auto">
+          <div className="glass p-1.5 rounded-full flex gap-1 border border-white/10 shadow-lg backdrop-blur-md bg-slate-950/80">
+            <button
+              onClick={() => { const s = 'dark'; setMapStyle(s); localStorage.setItem('lithos_mapstyle', s); }}
+              className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer ${mapStyle === 'dark' ? 'bg-white/20 text-white shadow-sm' : 'text-white/50 hover:text-white/90'}`}
+            >
+              <MapIcon className="w-3.5 h-3.5" /> Dark
+            </button>
+            <button
+              onClick={() => { const s = 'street'; setMapStyle(s); localStorage.setItem('lithos_mapstyle', s); }}
+              className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer ${mapStyle === 'street' ? 'bg-white/20 text-white shadow-sm' : 'text-white/50 hover:text-white/90'}`}
+            >
+              <Layers className="w-3.5 h-3.5" /> Sat
+            </button>
+            <button
+              onClick={() => { const s = '3d'; setMapStyle(s); localStorage.setItem('lithos_mapstyle', s); }}
+              className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer ${mapStyle === '3d' ? 'bg-cyan-500/30 text-cyan-300 border border-cyan-400/50 shadow-sm' : 'text-white/50 hover:text-white/90'}`}
+            >
+              <Globe className="w-3.5 h-3.5" /> 3D
+            </button>
+          </div>
+        </div>
+
+        {/* Floating Quick Locate Me Button */}
+        <div className="absolute top-16 right-4 z-30 pointer-events-auto">
+          <button
+            onClick={() => {
+              if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                  (pos) => {
+                    const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                    setStart(loc);
+                    setStartQuery('Current GPS Location');
+                    if (isNavigating) setCarPosition(loc);
+                    setFocusPoint(loc);
+                    speak("Location verified.");
+                  },
+                  (err) => console.error("Locate error", err),
+                  { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                );
+              }
+            }}
+            className="glass p-2.5 rounded-full flex items-center justify-center gap-1 border border-[#00C2FF]/30 shadow-lg backdrop-blur-md text-[#00C2FF] hover:bg-[#00C2FF]/10 transition-all bg-slate-950/80 cursor-pointer"
+            title="Locate Current Position"
+          >
+            <Navigation className="w-4 h-4" />
+          </button>
+        </div>
+
         <div className="absolute inset-0">
           {mapStyle === '3d' ? (
             /* ── 3D CesiumJS Terrain View ── */
@@ -955,6 +992,7 @@ const SafeRoute = () => {
               <CesiumTerrain3DLazy
                 region={selectedRegion}
                 riskGrid={riskGrid}
+                activeRunouts={activeRunouts}
                 routeResult={routeResult}
                 carPosition={carPosition}
                 start={start}
@@ -970,6 +1008,12 @@ const SafeRoute = () => {
                 onSetDemoSpeed={setDemoSpeed}
                 onLoadDemoPreset={loadDemoPreset}
                 onStartDemoSimulation={startDemoSimulation}
+                onStartLiveNavigation={() => {
+                  setIsNavigating(true);
+                  setIsDemoMode(false);
+                  setNavIndex(0);
+                  if (start) setCarPosition({ lat: start.lat, lng: start.lng });
+                }}
                 onMapClick={(loc) => {
                   if (!start) {
                     setStart(loc);
@@ -977,23 +1021,28 @@ const SafeRoute = () => {
                   } else if (!end) {
                     setEnd(loc);
                     setEndQuery(`${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}`);
+                  } else {
+                    // Update destination to newly clicked position
+                    setEnd(loc);
+                    setEndQuery(`${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}`);
+                    setRouteResult(null);
                   }
                 }}
               />
             </Suspense>
           ) : (
-            /* ── 2D Leaflet View (unchanged) ── */
+            /* ── 2D Leaflet View ── */
             <MapContainer
-            center={selectedRegion?.center || [25.3, 91.73]}
-            zoom={12}
-            className="w-full h-full"
-            zoomControl={false}
-          >
+              key={`${selectedRegion?.key || 'saferoute-2d'}-${mapStyle}`}
+              center={selectedRegion?.center || [27.33, 88.61]}
+              zoom={12}
+              preferCanvas={true}
+              className="w-full h-full"
+              zoomControl={false}
+            >
             <TileLayer
               url={mapStyle === 'dark'
-                ? (import.meta.env.VITE_CARTO_API_KEY
-                    ? `https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?api_key=${import.meta.env.VITE_CARTO_API_KEY}`
-                    : "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}")
+                ? "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"
                 : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               }
             />
@@ -1122,73 +1171,75 @@ const SafeRoute = () => {
               )}
             </div>
 
-            {/* Locate Me Native Control */}
-            <div className="absolute top-16 right-4 z-[1000]">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition(
-                      (pos) => {
-                        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                        setStart(prev => prev || loc);
-                        setStartQuery(prev => prev || 'Current GPS Location');
-                        if (isNavigating) setCarPosition(loc);
-                        setFocusPoint(loc);
-                        speak("Location verified.");
-                      },
-                      (err) => console.error("Locate error", err),
-                      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-                    );
-                  }
-                }}
-                className="glass p-2.5 rounded-full flex items-center justify-center gap-1 border border-[#00C2FF]/30 shadow-lg backdrop-blur-md text-[#00C2FF] hover:bg-[#00C2FF]/10 transition-all bg-[#00C2FF]/5"
-                title="Locate Me"
-              >
-                <Navigation className="w-4 h-4" />
-              </button>
-            </div>
 
-            {/* Map Style Toggle */}
-            <div className="absolute top-4 right-4 z-[1000]">
-              <div className="glass p-1.5 rounded-full flex gap-1 border border-white/10 shadow-lg backdrop-blur-md">
-                <button
-                  onClick={(e) => { e.stopPropagation(); const s = 'dark'; setMapStyle(s); localStorage.setItem('lithos_mapstyle', s); }}
-                  className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all ${mapStyle === 'dark' ? 'bg-white/20 text-white' : 'text-white/40 hover:text-white/80'}`}
-                >
-                  <MapIcon className="w-3.5 h-3.5" /> Dark
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); const s = 'street'; setMapStyle(s); localStorage.setItem('lithos_mapstyle', s); }}
-                  className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all ${mapStyle === 'street' ? 'bg-white/20 text-white' : 'text-white/40 hover:text-white/80'}`}
-                >
-                  <Layers className="w-3.5 h-3.5" /> Street
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); const s = '3d'; setMapStyle(s); localStorage.setItem('lithos_mapstyle', s); }}
-                  className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all ${mapStyle === '3d' ? 'bg-accent/30 text-accent border border-accent/40' : 'text-white/40 hover:text-white/80'}`}
-                >
-                  <Globe className="w-3.5 h-3.5" /> 3D
-                </button>
-              </div>
-            </div>
 
-            {/* Risk Grid Overlay */}
+            {/* Risk Heatmap Overlay — smooth colour gradient over the slope grid */}
             {riskGrid && (
-              <GeoJSON
-                key={selectedRegion?.key + '-' + riskGrid.features?.length}
-                data={riskGrid}
-                style={(feature) => {
-                  const level = feature.properties.risk_level;
-                  return {
-                    fillColor: level === 'RED' ? '#FF3B30' : level === 'ORANGE' ? '#FF9500' : '#30D158',
-                    fillOpacity: level === 'RED' ? 0.25 : level === 'ORANGE' ? 0.1 : 0.02,
-                    weight: 0,
-                    color: 'transparent'
-                  };
-                }}
+              <HeatmapLayer
+                key={`heatmap-${selectedRegion?.key}-${riskGrid.features?.length}`}
+                riskGrid={riskGrid}
+                opacity={0.75}
               />
             )}
+
+            {/* ── Active Debris Runout Fans Overlay in 2D ── */}
+            {activeRunouts && activeRunouts.map((fan) => {
+              const coords = fan?.fan_polygon?.coordinates?.[0];
+              if (!coords || !Array.isArray(coords) || coords.length < 3) return null;
+              return (
+                <React.Fragment key={`saferoute-fan-${fan.cell_id}`}>
+                  <Polygon
+                    positions={coords.map(c => [c[1], c[0]])}
+                    pathOptions={{
+                      fillColor: '#FF3B30',
+                      fillOpacity: 0.35,
+                      color: '#FF3B30',
+                      weight: 2,
+                      dashArray: '5, 3',
+                      interactive: true
+                    }}
+                  >
+                    <Popup className="glass-popup">
+                      <div className="p-2 text-white min-w-[200px]">
+                        <div className="flex items-center gap-1.5 text-xs font-black text-red-400 mb-1">
+                          <AlertTriangle className="w-3.5 h-3.5" /> DEBRIS RUNOUT IMPACT ZONE
+                        </div>
+                        <div className="text-[11px] text-white/80 space-y-0.5">
+                          <p><strong>Slope Unit:</strong> {fan.cell_id}</p>
+                          <p><strong>FoS (Seismic):</strong> <span className="text-red-400 font-bold">{fan.fos_seismic ? Number(fan.fos_seismic).toFixed(2) : '< 1.0'}</span></p>
+                          <p><strong>Runout Reach:</strong> {fan.runout_m ? `${Math.round(fan.runout_m)} m` : 'N/A'}</p>
+                          {fan.debris_volume_m3 && <p><strong>Debris Volume:</strong> {Math.round(fan.debris_volume_m3).toLocaleString()} m³</p>}
+                        </div>
+                        <p className="text-[10px] text-red-300/80 mt-1.5 font-semibold leading-tight">
+                          ⚠ High hazard: A* routing actively penalizes and steers away from this slope.
+                        </p>
+                      </div>
+                    </Popup>
+                  </Polygon>
+                  {fan.center_lat && fan.center_lon && (
+                    <Marker
+                      position={[fan.center_lat, fan.center_lon]}
+                      icon={L.divIcon({
+                        className: '',
+                        iconSize: [16, 16],
+                        iconAnchor: [8, 8],
+                        html: `
+                          <div style="width:16px;height:16px;border-radius:50%;background:#FF3B30;border:2px solid white;display:flex;align-items:center;justify-content:center;box-shadow:0 0 8px rgba(255,59,48,0.8);">
+                            <div style="width:4px;height:4px;border-radius:50%;background:white;"></div>
+                          </div>
+                        `
+                      })}
+                    >
+                      <Popup className="glass-popup">
+                        <div className="p-1 text-xs text-red-400 font-bold">
+                          Rupture Apex: {fan.cell_id}
+                        </div>
+                      </Popup>
+                    </Marker>
+                  )}
+                </React.Fragment>
+              );
+            })}
 
             {!isNavigating && start && (
               <Marker
@@ -1258,13 +1309,31 @@ const SafeRoute = () => {
               );
             })()}
 
-            {routeResult && (
+            {/* Alternative routes */}
+            {routeResult?.alternative_routes && routeResult.alternative_routes.map((alt, idx) => {
+              if (!alt?.segments?.length) return null;
+              return (
+                <Polyline
+                  key={`alt-route-${idx}`}
+                  positions={alt.segments.filter(s => s && s.lat != null && (s.lon != null || s.lng != null)).map(s => [s.lat, s.lon ?? s.lng])}
+                  pathOptions={{
+                    color: '#94A3B8',
+                    weight: 3.5,
+                    opacity: 0.6,
+                    dashArray: '8, 6'
+                  }}
+                />
+              );
+            })}
+
+            {/* Primary Safe Route */}
+            {routeResult?.route?.segments && (
               <Polyline
-                positions={routeResult.route.segments.map(s => [s.lat, s.lon])}
+                positions={routeResult.route.segments.filter(s => s && s.lat != null && (s.lon != null || s.lng != null)).map(s => [s.lat, s.lon ?? s.lng])}
                 pathOptions={{
                   color: routeResult.route.max_risk_level === 'RED' ? '#FF3B30' : '#00C2FF',
                   weight: 5,
-                  opacity: 0.8,
+                  opacity: 0.9,
                   dashArray: routeResult.route.max_risk_level === 'RED' ? '10, 10' : ''
                 }}
               />

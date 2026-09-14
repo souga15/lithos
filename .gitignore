@@ -70,12 +70,21 @@ seen_titles.json
 **/*Phase2_data*/**
 LandslideAtlas_new_2023.pdf
 
-# Temporary scripts
+# Temporary scripts & scratch files
 check_git_files.py
 scratch_extract_nb.py
+scratch/
+temp_*
+*.timestamp-*.mjs
+test_*.png
 
 # IDE / Editor Files
 .vscode/
 .idea/
 *.swp
 *.swo
+
+# Personal Local Report (Do not push)
+DETAILED_MODEL_REPORT_FOR_YOU.md
+personal_report*
+

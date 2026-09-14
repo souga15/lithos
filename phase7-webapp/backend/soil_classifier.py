@@ -88,65 +88,130 @@ def classify_soil(lat, lon, elevation_m, region_key):
                 "source": "GSI Sikkim Geological Map (2019)"
             }
 
-    # ── MANIPUR NH-6 ──
+    # ── MANIPUR NH-2 / NH-37 ──
     elif region_key == 'manipur_nh2':
-        return {
-            "soil_type":         "Flysch Sandstone Residual",
-            "cohesion_kpa":      9.0,
-            "friction_angle_deg": 25.0,
-            "unit_weight_knm3":  18.5,
-            "threshold_72h_mm":  130,
-            "failure_depth_m":   3.0,
-            "source": "GSI Manipur District Resource Map (2017)"
-        }
+        if elevation_m > 1200:
+            return {
+                "soil_type":         "Disang Sandstone Residual",
+                "cohesion_kpa":      24.0,
+                "friction_angle_deg": 33.0,
+                "unit_weight_knm3":  19.0,
+                "threshold_72h_mm":  160,
+                "failure_depth_m":   2.2,
+                "source": "GSI Manipur District Resource Map (2017) - Disang Group"
+            }
+        else:
+            return {
+                "soil_type":         "Imphal Valley Terraced Silt Loam",
+                "cohesion_kpa":      16.0,
+                "friction_angle_deg": 29.0,
+                "unit_weight_knm3":  18.2,
+                "threshold_72h_mm":  170,
+                "failure_depth_m":   3.0,
+                "source": "GSI Manipur District Resource Map (2017) - Valley Alluvium"
+            }
 
     # ── ARUNACHAL PRADESH ──
     elif region_key == 'arunachal_w':
-        return {
-            "soil_type":         "Himalayan Colluvium",
-            "cohesion_kpa":      7.0,
-            "friction_angle_deg": 23.0,
-            "unit_weight_knm3":  17.5,
-            "threshold_72h_mm":  100,
-            "failure_depth_m":   4.5,
-            "source": "GSI Arunachal Pradesh Geological Map (2016)"
-        }
+        if elevation_m > 2800:
+            return {
+                "soil_type":         "Himalayan Crystalline Regolith",
+                "cohesion_kpa":      24.0,
+                "friction_angle_deg": 35.0,
+                "unit_weight_knm3":  19.5,
+                "threshold_72h_mm":  160,
+                "failure_depth_m":   2.0,
+                "source": "GSI Arunachal Pradesh Geological Map (2016) - Higher Himalaya Crystalline"
+            }
+        elif elevation_m > 1000:
+            return {
+                "soil_type":         "Bomdila Gneiss Residual",
+                "cohesion_kpa":      26.0,
+                "friction_angle_deg": 34.0,
+                "unit_weight_knm3":  19.0,
+                "threshold_72h_mm":  170,
+                "failure_depth_m":   2.5,
+                "source": "GSI Arunachal Pradesh Geological Map (2016) - Lesser Himalayan Gneiss"
+            }
+        else:
+            return {
+                "soil_type":         "Siwalik Sandstone & Terraced Alluvium",
+                "cohesion_kpa":      18.0,
+                "friction_angle_deg": 31.0,
+                "unit_weight_knm3":  18.5,
+                "threshold_72h_mm":  180,
+                "failure_depth_m":   3.0,
+                "source": "GSI Arunachal Pradesh Geological Map (2016) - Sub-Himalayan Belt"
+            }
 
     # ── NAGALAND ──
     elif region_key == 'nagaland':
-        return {
-            "soil_type":         "Naga Hills Sandstone Residual",
-            "cohesion_kpa":      11.0,
-            "friction_angle_deg": 27.0,
-            "unit_weight_knm3":  18.0,
-            "threshold_72h_mm":  140,
-            "failure_depth_m":   3.0,
-            "source": "GSI Nagaland District Resource Map (2018)"
-        }
+        if elevation_m > 1100:
+            return {
+                "soil_type":         "Naga Hills Barail Sandstone",
+                "cohesion_kpa":      25.0,
+                "friction_angle_deg": 34.0,
+                "unit_weight_knm3":  19.2,
+                "threshold_72h_mm":  165,
+                "failure_depth_m":   2.2,
+                "source": "GSI Nagaland District Resource Map (2018) - Barail Group"
+            }
+        else:
+            return {
+                "soil_type":         "Disang Valley Silt Residual",
+                "cohesion_kpa":      18.0,
+                "friction_angle_deg": 30.0,
+                "unit_weight_knm3":  18.5,
+                "threshold_72h_mm":  175,
+                "failure_depth_m":   2.8,
+                "source": "GSI Nagaland District Resource Map (2018) - Valley Terraces"
+            }
 
-    # ── ASSAM HILLS ──
+    # ── ASSAM (HILLS & VALLEY) ──
     elif region_key in ['assam_hills', 'assam_valley']:
-        return {
-            "soil_type":         "Alluvial Sandy Clay",
-            "cohesion_kpa":      6.0,
-            "friction_angle_deg": 20.0,
-            "unit_weight_knm3":  17.0,
-            "threshold_72h_mm":  90,
-            "failure_depth_m":   5.0,
-            "source": "GSI Assam Geological Map (2017)"
-        }
+        if elevation_m > 300:
+            return {
+                "soil_type":         "Karbi Anglong Granite Gneiss & Sandstone",
+                "cohesion_kpa":      22.0,
+                "friction_angle_deg": 32.0,
+                "unit_weight_knm3":  19.0,
+                "threshold_72h_mm":  150,
+                "failure_depth_m":   2.5,
+                "source": "GSI Assam Geological Map (2017) - Karbi Plateau & Barail Range"
+            }
+        else:
+            return {
+                "soil_type":         "Brahmaputra Alluvial Plain Sandy Clay",
+                "cohesion_kpa":      15.0,
+                "friction_angle_deg": 28.0,
+                "unit_weight_knm3":  18.0,
+                "threshold_72h_mm":  180,
+                "failure_depth_m":   3.0,
+                "source": "GSI Assam Geological Map (2017) - Valley Alluvium"
+            }
 
     # ── MIZORAM ──
     elif region_key == 'mizoram':
-        return {
-            "soil_type":         "Barail Sandstone Siltstone",
-            "cohesion_kpa":      10.0,
-            "friction_angle_deg": 26.0,
-            "unit_weight_knm3":  18.2,
-            "threshold_72h_mm":  130,
-            "failure_depth_m":   3.2,
-            "source": "GSI Mizoram District Resource Map (2018)"
-        }
+        if elevation_m > 800:
+            return {
+                "soil_type":         "Surma & Barail Sandstone Ridge",
+                "cohesion_kpa":      23.0,
+                "friction_angle_deg": 33.0,
+                "unit_weight_knm3":  19.0,
+                "threshold_72h_mm":  160,
+                "failure_depth_m":   2.2,
+                "source": "GSI Mizoram District Resource Map (2018) - Ridge Formations"
+            }
+        else:
+            return {
+                "soil_type":         "Lushai Valley Shale & Siltstone",
+                "cohesion_kpa":      17.0,
+                "friction_angle_deg": 30.0,
+                "unit_weight_knm3":  18.2,
+                "threshold_72h_mm":  170,
+                "failure_depth_m":   2.8,
+                "source": "GSI Mizoram District Resource Map (2018) - Valley Slopes"
+            }
 
     # ── TRIPURA ──
     elif region_key == 'tripura':

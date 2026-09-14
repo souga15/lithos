@@ -86,7 +86,7 @@ class DeformationService:
         
         self.cache[cache_key] = result
         self.cache_dirty += 1
-        if self.cache_dirty > 500:
+        if self.cache_dirty > 20000:
             self._save_cache()
             
         return result

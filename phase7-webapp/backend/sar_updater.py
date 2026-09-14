@@ -74,6 +74,8 @@ def fetch_region_sar(region_key, bbox, output_dir):
 def run_global_update():
     """Loops through all 9 regions and updates their SAR imagery if needed."""
     if not gee_service.initialized:
+        gee_service._initialize()
+    if not gee_service.initialized:
         print("[SAR Updater] GEE Service not initialized. Skipping.")
         return
 
