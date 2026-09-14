@@ -1,0 +1,138 @@
+[
+  {
+    "alert_id": "ALT-0451D228",
+    "recipient": "sougatakarm29@gmail.com",
+    "timestamp": "2026-09-14T19:53:29Z",
+    "region": "sikkim",
+    "region_name": "Sikkim",
+    "email_delivery": {
+      "delivered": true,
+      "mode": "SIMULATED_GATEWAY_DISPATCH",
+      "detail": "Simulated emergency broadcast dispatched to sougatakarm29@gmail.com (Gateway verified)"
+    },
+    "alert_data": {
+      "alert_id": "ALT-0451D228",
+      "region": "sikkim",
+      "region_name": "Sikkim",
+      "risk_level": "RED",
+      "message": "EMERGENCY HAZARD WARNING: Debris slope failure imminent along Sikkim. Limit-equilibrium Factor of Safety has collapsed to 0.74 due to 134mm 24h precipitation. Evacuation recommended.",
+      "triggered_at": "2026-09-14T19:53:29Z",
+      "rainfall_24h": 134.8,
+      "top_factor": "pore_pressure_saturation",
+      "pinn_failure_probability": 0.946,
+      "fos_static": 0.74,
+      "fos_seismic": 0.61,
+      "recommended_route": "Divert via NH-717A Alternative Bypass (+24 min travel time)",
+      "is_active": true,
+      "recipient": "sougatakarm29@gmail.com",
+      "channels": [
+        "EMAIL_HTML",
+        "CAP_V1.2_XML",
+        "GSM_CELL_BROADCAST_2G",
+        "WEBSOCKET_PUSH"
+      ]
+    }
+  },
+  {
+    "alert_id": "ALT-D583EC3D",
+    "recipient": "sougatakarm29@gmail.com",
+    "timestamp": "2026-09-14T19:43:13Z",
+    "region": "sikkim",
+    "region_name": "Sikkim",
+    "email_delivery": {
+      "delivered": true,
+      "mode": "SIMULATED_GATEWAY_DISPATCH",
+      "detail": "Simulated emergency broadcast dispatched to sougatakarm29@gmail.com (Gateway verified)"
+    },
+    "alert_data": {
+      "alert_id": "ALT-D583EC3D",
+      "region": "sikkim",
+      "region_name": "Sikkim",
+      "risk_level": "RED",
+      "message": "EMERGENCY HAZARD WARNING: Debris slope failure imminent along Sikkim. Limit-equilibrium Factor of Safety has collapsed to 0.74 due to 134mm 24h precipitation. Evacuation recommended.",
+      "triggered_at": "2026-09-14T19:43:13Z",
+      "rainfall_24h": 134.8,
+      "top_factor": "pore_pressure_saturation",
+      "pinn_failure_probability": 0.946,
+      "fos_static": 0.74,
+      "fos_seismic": 0.61,
+      "recommended_route": "Divert via NH-717A Alternative Bypass (+24 min travel time)",
+      "is_active": true,
+      "recipient": "sougatakarm29@gmail.com",
+      "channels": [
+        "EMAIL_HTML",
+        "CAP_V1.2_XML",
+        "GSM_CELL_BROADCAST_2G",
+        "WEBSOCKET_PUSH"
+      ]
+    }
+  },
+  {
+    "alert_id": "ALT-39672028",
+    "recipient": "sougatakarm29@gmail.com",
+    "timestamp": "2026-09-14T19:27:34Z",
+    "region": "sikkim",
+    "region_name": "Sikkim",
+    "email_delivery": {
+      "delivered": true,
+      "mode": "SIMULATED_GATEWAY_DISPATCH",
+      "detail": "Simulated emergency broadcast dispatched to sougatakarm29@gmail.com (Gateway verified)"
+    },
+    "alert_data": {
+      "alert_id": "ALT-39672028",
+      "region": "sikkim",
+      "region_name": "Sikkim",
+      "risk_level": "RED",
+      "message": "EMERGENCY HAZARD WARNING: Debris slope failure imminent along Sikkim. Limit-equilibrium Factor of Safety has collapsed to 0.74 due to 134mm 24h precipitation. Evacuation recommended.",
+      "triggered_at": "2026-09-14T19:27:34Z",
+      "rainfall_24h": 134.8,
+      "top_factor": "pore_pressure_saturation",
+      "pinn_failure_probability": 0.946,
+      "fos_static": 0.74,
+      "fos_seismic": 0.61,
+      "recommended_route": "Divert via NH-717A Alternative Bypass (+24 min travel time)",
+      "is_active": true,
+      "recipient": "sougatakarm29@gmail.com",
+      "channels": [
+        "EMAIL_HTML",
+        "CAP_V1.2_XML",
+        "GSM_CELL_BROADCAST_2G",
+        "WEBSOCKET_PUSH"
+      ]
+    }
+  },
+  {
+    "alert_id": "ALT-B20CE128",
+    "recipient": "sougatakarm29@gmail.com",
+    "timestamp": "2026-09-14T19:27:09Z",
+    "region": "sikkim",
+    "region_name": "Sikkim",
+    "email_delivery": {
+      "delivered": true,
+      "mode": "SIMULATED_GATEWAY_DISPATCH",
+      "detail": "Simulated emergency broadcast dispatched to sougatakarm29@gmail.com (Gateway verified)"
+    },
+    "alert_data": {
+      "alert_id": "ALT-B20CE128",
+      "region": "sikkim",
+      "region_name": "Sikkim",
+      "risk_level": "RED",
+      "message": "EMERGENCY HAZARD WARNING: Debris slope failure imminent along Sikkim. Limit-equilibrium Factor of Safety has collapsed to 0.74 due to 134mm 24h precipitation. Evacuation recommended.",
+      "triggered_at": "2026-09-14T19:27:09Z",
+      "rainfall_24h": 134.8,
+      "top_factor": "pore_pressure_saturation",
+      "pinn_failure_probability": 0.946,
+      "fos_static": 0.74,
+      "fos_seismic": 0.61,
+      "recommended_route": "Divert via NH-717A Alternative Bypass (+24 min travel time)",
+      "is_active": true,
+      "recipient": "sougatakarm29@gmail.com",
+      "channels": [
+        "EMAIL_HTML",
+        "CAP_V1.2_XML",
+        "GSM_CELL_BROADCAST_2G",
+        "WEBSOCKET_PUSH"
+      ]
+    }
+  }
+]

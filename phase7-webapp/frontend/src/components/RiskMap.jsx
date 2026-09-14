@@ -55,7 +55,7 @@ const RiskMap = ({ region, riskData, reports, onCellClick, activeRunout, globalR
         zoomControl={false}
       >
         <TileLayer
-          attribution='&copy; OpenStreetMap contributors &copy; CARTO'
+          attribution='Tiles &copy; Esri'
           url={getTileLayer()}
         />
         

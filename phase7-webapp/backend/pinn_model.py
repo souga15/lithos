@@ -107,9 +107,45 @@ def calculate_fos(x):
     
     return round(float(fos_static), 3), round(float(fos_seismic), 3)
 
+class TemperatureScaler(nn.Module):
+    """
+    Platt Scaling / Temperature Scaling Wrapper (Guo et al., ICML 2017).
+    Calibrated on Northeast India spatial holdout validation split (ECE minimized).
+    """
+    def __init__(self, base_model, temperature=1.080365777015686):
+        super().__init__()
+        self.model = base_model
+        self.register_buffer('temperature', torch.tensor([temperature], dtype=torch.float32))
+
+    def forward(self, x):
+        raw = self.model(x)
+        raw_probs = raw.squeeze(-1) if raw.dim() > 1 else raw
+        clipped = torch.clamp(raw_probs, 1e-6, 1.0 - 1e-6)
+        logits  = torch.log(clipped / (1.0 - clipped))
+        calibrated = torch.sigmoid(logits / self.temperature)
+        if raw.dim() > 1:
+            return calibrated.unsqueeze(-1)
+        return calibrated
+
+    def predict_with_uncertainty(self, x, n_samples=30):
+        self.model.train()
+        for module in self.model.modules():
+            if isinstance(module, nn.BatchNorm1d):
+                module.eval()
+        with torch.no_grad():
+            raw_samples = torch.stack([self.model(x) for _ in range(n_samples)], dim=0)
+            clipped = torch.clamp(raw_samples, 1e-6, 1.0 - 1e-6)
+            logits = torch.log(clipped / (1.0 - clipped))
+            cal_samples = torch.sigmoid(logits / self.temperature)
+        self.model.eval()
+        return cal_samples.mean(0).squeeze(), cal_samples.std(0).squeeze()
+
 def dummy_train_model():
-    """Loads Phase 11 trained PINN model weights or initializes model."""
-    model_path = os.path.join(os.path.dirname(__file__), "pinn_model_v2.pth")
+    """Loads Phase 11 trained PINN model weights and applies Platt calibration."""
+    base_dir = os.path.dirname(__file__)
+    model_path = os.path.join(base_dir, "pinn_model_v2.pth")
+    cal_path = os.path.join(base_dir, "lithos_pinn_calibrated.pt")
+    
     if os.path.exists(model_path):
         try:
             ckpt = torch.load(model_path, map_location=torch.device('cpu'), weights_only=False)
@@ -117,15 +153,28 @@ def dummy_train_model():
                 model = AdvancedLandslidePINN(ckpt['input_mean'], ckpt['input_std'])
                 model.load_state_dict(ckpt['model_state_dict'])
                 model.eval()
-                print(f"[PINN] Loaded trained Phase 11 PINN model (Val AUC: {ckpt.get('best_val_auc', 0.897):.4f})")
-                return model
+                
+                temperature = 1.080365777015686
+                if os.path.exists(cal_path):
+                    try:
+                        cal_ckpt = torch.load(cal_path, map_location=torch.device('cpu'), weights_only=False)
+                        if isinstance(cal_ckpt, dict) and 'temperature' in cal_ckpt:
+                            temperature = float(cal_ckpt['temperature'])
+                    except Exception as ce:
+                        print(f"[PINN] Note: using default Platt temperature ({ce})")
+                
+                calibrated_model = TemperatureScaler(model, temperature=temperature)
+                calibrated_model.eval()
+                print(f"[PINN] Loaded Phase 11 Calibrated PINN (pinn_model_v2.pth + Platt T={temperature:.4f}, Val AUC: {ckpt.get('best_val_auc', 0.897):.4f})")
+                return calibrated_model
         except Exception as e:
             print(f"[PINN] Error loading {model_path}: {e}")
             
-    print("[PINN] Initializing fallback PINN model...")
+    print("[PINN] WARNING: Model weights not found, initializing fallback PINN model...")
     model = AdvancedLandslidePINN()
     model.eval()
-    return model
+    return TemperatureScaler(model, temperature=1.0)
 
 if __name__ == "__main__":
     model = dummy_train_model()
+

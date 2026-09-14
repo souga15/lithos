@@ -31,7 +31,7 @@ const RiskMap = ({ region, riskData, reports, onCellClick, activeRunout, globalR
         // Placeholder for SAR WMS or different tile
         return 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'; 
       default:
-        return 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+        return 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}';
     }
   };
 
@@ -51,7 +51,7 @@ const RiskMap = ({ region, riskData, reports, onCellClick, activeRunout, globalR
         zoomControl={false}
       >
         <TileLayer
-          attribution='&copy; OpenStreetMap contributors &copy; CARTO'
+          attribution='Tiles &copy; Esri'
           url={getTileLayer()}
         />
         
