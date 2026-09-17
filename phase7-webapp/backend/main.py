@@ -21,6 +21,7 @@ import hashlib
 
 import numpy as np
 from scipy.interpolate import griddata
+from scipy.ndimage import gaussian_filter, distance_transform_edt
 from PIL import Image as PILImage, ImageDraw, ImageFilter
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query, Response
@@ -408,13 +409,17 @@ from scipy.interpolate import griddata
 from io import BytesIO
 
 
+_HEATMAP_CACHE: Dict[tuple, bytes] = {}
+
+
 @app.get("/api/heatmap-image")
 def get_heatmap_image(region: str = Query("sikkim"), mode: str = Query("slope_units"), res: int = Query(1024)):
     """Generate an accurate physical heatmap PNG from real PINN slope units or continuous grid.
 
     - mode="slope_units": Rasterizes the exact DEM slope-unit polygons with PINN risk scores,
       zero artificial borders, and subtle anti-aliased edge blending for 100% geographical accuracy.
-    - mode="smooth_field": Continuous cubic spline field interpolation.
+    - mode="smooth_field": Continuous spatial gradient field with adaptive regional contrast,
+      topographically aligned slope modulation, and seamless diffusion.
     """
     if region not in CELLS:
         raise HTTPException(status_code=404, detail=f"Region '{region}' not found")
@@ -427,6 +432,22 @@ def get_heatmap_image(region: str = Query("sikkim"), mode: str = Query("slope_un
     south, north = reg["bbox"][1], reg["bbox"][3]
     west, east   = reg["bbox"][0], reg["bbox"][2]
     res = min(max(res, 512), 2048)
+
+    cache_key = (region, mode, res)
+    if cache_key in _HEATMAP_CACHE:
+        return Response(
+            content=_HEATMAP_CACHE[cache_key],
+            media_type="image/png",
+            headers={
+                "X-Bounds-South": str(round(south, 6)),
+                "X-Bounds-North": str(round(north, 6)),
+                "X-Bounds-West":  str(round(west, 6)),
+                "X-Bounds-East":  str(round(east, 6)),
+                "X-Cell-Count":   str(len(cells)),
+                "Cache-Control":  "public, max-age=300",
+                "Access-Control-Expose-Headers": "X-Bounds-South,X-Bounds-North,X-Bounds-West,X-Bounds-East,X-Cell-Count",
+            },
+        )
 
     from PIL import Image as PILImage, ImageDraw, ImageFilter
 
@@ -473,32 +494,90 @@ def get_heatmap_image(region: str = Query("sikkim"), mode: str = Query("slope_un
                 col = score_to_rgba(c['risk_score'])
                 draw.polygon(pts, fill=col)
 
-        # Subtle edge anti-aliasing to make slope transitions smooth while keeping 100% boundary accuracy
         final_img = img.filter(ImageFilter.GaussianBlur(radius=1.0))
 
     else:
-        # Continuous interpolation field
-        lats   = np.array([c["center_lat"] for c in cells], dtype=np.float64)
-        lons   = np.array([c["center_lon"] for c in cells], dtype=np.float64)
-        scores = np.array([c["risk_score"]  for c in cells], dtype=np.float64)
+        # Continuous spatial gradient field with adaptive regional contrast
+        scores = np.array([c["risk_score"] for c in cells], dtype=np.float32)
+        slopes = np.array([c.get("slope_mean", 15.0) for c in cells], dtype=np.float32)
 
-        grid_lon = np.linspace(west, east, res)
-        grid_lat = np.linspace(south, north, res)
-        glon, glat = np.meshgrid(grid_lon, grid_lat)
+        # 1. Dynamic range analysis
+        s_min = float(np.percentile(scores, 5))
+        s_med = float(np.median(scores))
+        s_p85 = float(np.percentile(scores, 85))
+        s_p95 = float(np.percentile(scores, 95))
+        s_max = float(np.max(scores))
 
-        try:
-            grid_risk = griddata((lons, lats), scores, (glon, glat), method='linear', fill_value=np.nan)
-        except Exception:
-            grid_risk = griddata((lons, lats), scores, (glon, glat), method='nearest')
+        is_compressed = bool(s_p95 < 0.60 or s_med < 0.20)
 
-        nan_mask = np.isnan(grid_risk)
-        if nan_mask.any():
-            nearest = griddata((lons, lats), scores, (glon, glat), method='nearest')
-            grid_risk[nan_mask] = nearest[nan_mask]
+        # 2. Adaptive risk score transformation
+        if not is_compressed:
+            adapted_cell_scores = scores.copy()
+        else:
+            adapted_cell_scores = np.zeros_like(scores)
+            m_low = scores <= s_med
+            adapted_cell_scores[m_low] = 0.10 + 0.25 * np.clip((scores[m_low] - s_min) / max(0.01, s_med - s_min), 0.0, 1.0)
 
-        grid_risk = np.clip(grid_risk, 0.0, 1.0)[::-1]
+            m_med = (scores > s_med) & (scores <= s_p85)
+            adapted_cell_scores[m_med] = 0.35 + 0.25 * np.clip((scores[m_med] - s_med) / max(0.01, s_p85 - s_med), 0.0, 1.0)
 
-        v = grid_risk
+            m_high = (scores > s_p85) & (scores <= s_p95)
+            adapted_cell_scores[m_high] = 0.60 + 0.22 * np.clip((scores[m_high] - s_p85) / max(0.01, s_p95 - s_p85), 0.0, 1.0)
+
+            m_crit = scores > s_p95
+            adapted_cell_scores[m_crit] = 0.82 + 0.17 * np.clip((scores[m_crit] - s_p95) / max(0.01, s_max - s_p95), 0.0, 1.0)
+
+            steep = slopes > 24.0
+            slope_boost = np.clip((slopes[steep] - 24.0) / 60.0, 0.0, 0.12).astype(np.float32)
+            adapted_cell_scores[steep] = np.clip(adapted_cell_scores[steep] + slope_boost, 0.0, 1.0)
+
+        # 3. Topographically aligned rasterization
+        risk_img = PILImage.new('F', (res, res), 0.0)
+        draw_risk = ImageDraw.Draw(risk_img)
+
+        for c, sc in zip(cells, adapted_cell_scores):
+            poly = c.get('polygon', [])
+            if not poly or len(poly) < 3:
+                step = 0.009
+                lat, lon = c['center_lat'], c['center_lon']
+                poly = [
+                    [lon - step, lat - step],
+                    [lon + step, lat - step],
+                    [lon + step, lat + step],
+                    [lon - step, lat + step]
+                ]
+
+            pts = [
+                (int((lon - west) / (east - west) * (res - 1)),
+                 int((north - lat) / (north - south) * (res - 1)))
+                for lon, lat in poly
+            ]
+            if len(pts) >= 3:
+                draw_risk.polygon(pts, fill=float(sc))
+
+        risk_arr = np.array(risk_img, dtype=np.float32)
+        mask = risk_arr > 0
+
+        # 4. Seamless raster seam filling between adjacent slope units
+        if mask.any() and not mask.all():
+            ind = distance_transform_edt(~mask, return_distances=False, return_indices=True)
+            filled_risk = risk_arr[tuple(ind)]
+            dist = distance_transform_edt(~mask)
+        else:
+            filled_risk = risk_arr
+            dist = np.zeros_like(risk_arr)
+
+        # 5. Multi-scale continuous spatial diffusion
+        sigma = max(3.0, res / 180.0)
+        smooth_risk = gaussian_filter(filled_risk, sigma=sigma)
+
+        # 6. Smooth spatial decay for unpopulated flat river plains (e.g. Brahmaputra plain, Imphal lake basin)
+        decay_dist = max(8.0, res / 60.0)
+        decay = np.exp(-(dist / decay_dist)**2)
+        v = smooth_risk * decay + 0.05 * (1.0 - decay)
+        v = np.clip(v, 0.0, 1.0)
+
+        # 7. Color mapping with vibrant continuous gradient
         rgba = np.zeros((res, res, 4), dtype=np.uint8)
 
         m0 = v < 0.20
@@ -537,7 +616,7 @@ def get_heatmap_image(region: str = Query("sikkim"), mode: str = Query("slope_un
         rgba[m4, 3] = (215 + t4 * 20).astype(np.uint8)
 
         final_img = PILImage.fromarray(rgba, 'RGBA')
-        final_img = final_img.filter(ImageFilter.GaussianBlur(radius=2.0))
+        final_img = final_img.filter(ImageFilter.GaussianBlur(radius=1.0))
 
     # Mask heatmap image strictly to official state boundary polygon so zero pixels bleed outside
     boundary_file = os.path.join(os.path.dirname(__file__), "data", "ne_state_boundaries.json")
@@ -565,11 +644,11 @@ def get_heatmap_image(region: str = Query("sikkim"), mode: str = Query("slope_un
 
     buf = BytesIO()
     final_img.save(buf, format='PNG', optimize=True)
-    buf.seek(0)
-
+    img_bytes = buf.getvalue()
+    _HEATMAP_CACHE[cache_key] = img_bytes
 
     return Response(
-        content=buf.read(),
+        content=img_bytes,
         media_type="image/png",
         headers={
             "X-Bounds-South": str(round(south, 6)),
@@ -1339,6 +1418,22 @@ def get_3d_heatmap_mesh(region: str = Query(default="sikkim"), grid_res: int = Q
             pts = np.column_stack([sample_sub["center_lon"].to_numpy(), sample_sub["center_lat"].to_numpy()])
             elev_pts = sample_sub["elevation_m"].to_numpy()
             probs = sample_sub["pred_probability"].to_numpy()
+            p_med = float(np.median(probs))
+            p_p95 = float(np.percentile(probs, 95))
+            if p_p95 < 0.60 or p_med < 0.20:
+                p_min = float(np.percentile(probs, 5))
+                p_p85 = float(np.percentile(probs, 85))
+                p_max = float(np.max(probs))
+                ap = np.zeros_like(probs)
+                m_l = probs <= p_med
+                ap[m_l] = 0.10 + 0.25 * np.clip((probs[m_l] - p_min) / max(0.01, p_med - p_min), 0.0, 1.0)
+                m_m = (probs > p_med) & (probs <= p_p85)
+                ap[m_m] = 0.35 + 0.25 * np.clip((probs[m_m] - p_med) / max(0.01, p_p85 - p_med), 0.0, 1.0)
+                m_h = (probs > p_p85) & (probs <= p_p95)
+                ap[m_h] = 0.60 + 0.22 * np.clip((probs[m_h] - p_p85) / max(0.01, p_p95 - p_p85), 0.0, 1.0)
+                m_c = probs > p_p95
+                ap[m_c] = 0.82 + 0.17 * np.clip((probs[m_c] - p_p95) / max(0.01, p_max - p_p95), 0.0, 1.0)
+                probs = ap
             
             z_grid = griddata(pts, elev_pts, (lon_mesh, lat_mesh), method='linear')
             nan_m = np.isnan(z_grid)
