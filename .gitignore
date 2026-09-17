@@ -88,3 +88,7 @@ test_*.png
 DETAILED_MODEL_REPORT_FOR_YOU.md
 personal_report*
 
+# Dedicated final export repository
+lithos-final/
+
+
