@@ -269,13 +269,53 @@ def get_regions():
     return {"regions": result}
 
 
+def compute_adapted_cell_scores(cells: list) -> np.ndarray:
+    """Harmonizes slope unit risk scores with continuous gradient field using regional dynamic contrast
+    and physical slope modulation (>24 deg) for terrain consistency across all Northeast states.
+    """
+    if not cells:
+        return np.array([], dtype=np.float32)
+    scores = np.array([c.get("risk_score", 0.0) for c in cells], dtype=np.float32)
+    slopes = np.array([c.get("slope_mean", 15.0) for c in cells], dtype=np.float32)
+
+    s_min = float(np.percentile(scores, 5))
+    s_med = float(np.median(scores))
+    s_p85 = float(np.percentile(scores, 85))
+    s_p95 = float(np.percentile(scores, 95))
+    s_max = float(np.max(scores))
+
+    is_compressed = bool(s_p95 < 0.60 or s_med < 0.20)
+    if not is_compressed:
+        return scores
+
+    adapted = np.zeros_like(scores)
+    m_low = scores <= s_med
+    adapted[m_low] = 0.10 + 0.25 * np.clip((scores[m_low] - s_min) / max(0.01, s_med - s_min), 0.0, 1.0)
+
+    m_med = (scores > s_med) & (scores <= s_p85)
+    adapted[m_med] = 0.35 + 0.25 * np.clip((scores[m_med] - s_med) / max(0.01, s_p85 - s_med), 0.0, 1.0)
+
+    m_high = (scores > s_p85) & (scores <= s_p95)
+    adapted[m_high] = 0.60 + 0.22 * np.clip((scores[m_high] - s_p85) / max(0.01, s_p95 - s_p85), 0.0, 1.0)
+
+    m_crit = scores > s_p95
+    adapted[m_crit] = 0.82 + 0.17 * np.clip((scores[m_crit] - s_p95) / max(0.01, s_max - s_p95), 0.0, 1.0)
+
+    steep = slopes > 24.0
+    slope_boost = np.clip((slopes[steep] - 24.0) / 60.0, 0.0, 0.12).astype(np.float32)
+    adapted[steep] = np.clip(adapted[steep] + slope_boost, 0.0, 1.0)
+
+    return adapted
+
+
 @app.get("/api/risk-grid")
 def get_risk_grid(region: str = Query("cherrapunji")):
     if region not in CELLS:
         raise HTTPException(status_code=404, detail=f"Region '{region}' not found")
     cells = CELLS[region]
+    adapted_scores = compute_adapted_cell_scores(cells)
     features = []
-    for c in cells:
+    for c, sc in zip(cells, adapted_scores):
         # Phase 9: Real Slope Unit Polygons loaded from GPKG
         if "polygon" in c and len(c["polygon"]) > 0:
             coordinates = [c["polygon"]]
@@ -290,13 +330,17 @@ def get_risk_grid(region: str = Query("cherrapunji")):
                 [c["center_lon"] - step, c["center_lat"] - step],
             ]]
 
+        props = dict(c)
+        props["raw_risk_score"] = c.get("risk_score", 0.0)
+        props["risk_score"] = round(float(sc), 4)
+
         features.append({
             "type": "Feature",
             "geometry": {
                 "type": "Polygon",
                 "coordinates": coordinates,
             },
-            "properties": c,
+            "properties": props,
         })
     return {
         "type": "FeatureCollection",
@@ -451,6 +495,8 @@ def get_heatmap_image(region: str = Query("sikkim"), mode: str = Query("slope_un
 
     from PIL import Image as PILImage, ImageDraw, ImageFilter
 
+    adapted_cell_scores = compute_adapted_cell_scores(cells)
+
     if mode == "slope_units":
         img = PILImage.new('RGBA', (res, res), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
@@ -472,7 +518,7 @@ def get_heatmap_image(region: str = Query("sikkim"), mode: str = Query("slope_un
                 t = score / 0.20
                 return (int(20 + t*25), int(95 + t*90), int(210 - t*25), 150)
 
-        for c in cells:
+        for c, sc in zip(cells, adapted_cell_scores):
             poly = c.get('polygon', [])
             if not poly or len(poly) < 3:
                 step = 0.009
@@ -491,47 +537,14 @@ def get_heatmap_image(region: str = Query("sikkim"), mode: str = Query("slope_un
                 pts.append((px, py))
 
             if len(pts) >= 3:
-                col = score_to_rgba(c['risk_score'])
+                col = score_to_rgba(float(sc))
                 draw.polygon(pts, fill=col)
 
         final_img = img.filter(ImageFilter.GaussianBlur(radius=1.0))
 
     else:
         # Continuous spatial gradient field with adaptive regional contrast
-        scores = np.array([c["risk_score"] for c in cells], dtype=np.float32)
-        slopes = np.array([c.get("slope_mean", 15.0) for c in cells], dtype=np.float32)
-
-        # 1. Dynamic range analysis
-        s_min = float(np.percentile(scores, 5))
-        s_med = float(np.median(scores))
-        s_p85 = float(np.percentile(scores, 85))
-        s_p95 = float(np.percentile(scores, 95))
-        s_max = float(np.max(scores))
-
-        is_compressed = bool(s_p95 < 0.60 or s_med < 0.20)
-
-        # 2. Adaptive risk score transformation
-        if not is_compressed:
-            adapted_cell_scores = scores.copy()
-        else:
-            adapted_cell_scores = np.zeros_like(scores)
-            m_low = scores <= s_med
-            adapted_cell_scores[m_low] = 0.10 + 0.25 * np.clip((scores[m_low] - s_min) / max(0.01, s_med - s_min), 0.0, 1.0)
-
-            m_med = (scores > s_med) & (scores <= s_p85)
-            adapted_cell_scores[m_med] = 0.35 + 0.25 * np.clip((scores[m_med] - s_med) / max(0.01, s_p85 - s_med), 0.0, 1.0)
-
-            m_high = (scores > s_p85) & (scores <= s_p95)
-            adapted_cell_scores[m_high] = 0.60 + 0.22 * np.clip((scores[m_high] - s_p85) / max(0.01, s_p95 - s_p85), 0.0, 1.0)
-
-            m_crit = scores > s_p95
-            adapted_cell_scores[m_crit] = 0.82 + 0.17 * np.clip((scores[m_crit] - s_p95) / max(0.01, s_max - s_p95), 0.0, 1.0)
-
-            steep = slopes > 24.0
-            slope_boost = np.clip((slopes[steep] - 24.0) / 60.0, 0.0, 0.12).astype(np.float32)
-            adapted_cell_scores[steep] = np.clip(adapted_cell_scores[steep] + slope_boost, 0.0, 1.0)
-
-        # 3. Topographically aligned rasterization
+        # Topographically aligned rasterization
         risk_img = PILImage.new('F', (res, res), 0.0)
         draw_risk = ImageDraw.Draw(risk_img)
 
@@ -1474,6 +1487,22 @@ def get_3d_heatmap_mesh(region: str = Query(default="sikkim"), grid_res: int = Q
                     probs = np.random.uniform(0.1, 0.9, len(df))
             if np.ndim(probs) == 0:
                 probs = np.array([probs.item()])
+            p_med = float(np.median(probs))
+            p_p95 = float(np.percentile(probs, 95))
+            if p_p95 < 0.60 or p_med < 0.20:
+                p_min = float(np.percentile(probs, 5))
+                p_p85 = float(np.percentile(probs, 85))
+                p_max = float(np.max(probs))
+                ap = np.zeros_like(probs)
+                m_l = probs <= p_med
+                ap[m_l] = 0.10 + 0.25 * np.clip((probs[m_l] - p_min) / max(0.01, p_med - p_min), 0.0, 1.0)
+                m_m = (probs > p_med) & (probs <= p_p85)
+                ap[m_m] = 0.35 + 0.25 * np.clip((probs[m_m] - p_med) / max(0.01, p_p85 - p_med), 0.0, 1.0)
+                m_h = (probs > p_p85) & (probs <= p_p95)
+                ap[m_h] = 0.60 + 0.22 * np.clip((probs[m_h] - p_p85) / max(0.01, p_p95 - p_p85), 0.0, 1.0)
+                m_c = probs > p_p95
+                ap[m_c] = 0.82 + 0.17 * np.clip((probs[m_c] - p_p95) / max(0.01, p_max - p_p95), 0.0, 1.0)
+                probs = ap
                 
             z_grid = griddata(pts, elev_pts, (lon_mesh, lat_mesh), method='linear')
             nan_m = np.isnan(z_grid)
