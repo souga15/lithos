@@ -48,6 +48,7 @@ seen_titles.json
 *.cache
 *.zip
 **/*.zip
+hf_space/
 
 # Large Datasets & Raw Satellite Archives (>50MB / GitHub 100MB Limit)
 *.gpkg

@@ -919,7 +919,7 @@ async def send_test_alert(req: AlertSendTestRequest):
     now_iso = _iso(now_dt)
     reg_name = region_info.get("name", region_key.title())
     
-    default_msg = f"EMERGENCY HAZARD WARNING: Debris slope failure imminent along {reg_name}. Limit-equilibrium Factor of Safety has collapsed to 0.74 due to 134mm 24h precipitation. Evacuation recommended."
+    default_msg = f"EMERGENCY HAZARD WARNING: Very high risk area detected along {reg_name}. Limit-equilibrium Factor of Safety has decreased to 0.74 due to 134mm 24h precipitation. Precautionary evacuation recommended."
     alert_message = req.message or default_msg
     
     alert_record = {

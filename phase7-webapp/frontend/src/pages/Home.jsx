@@ -287,62 +287,62 @@ const Home = ({ setAlertCount }) => {
       {/* Cell Detail Modal (Conditional) */}
       {selectedCell && (
         <div className="absolute inset-0 flex items-center justify-center p-4 z-50 animate-fade-in backdrop-blur-sm bg-bg/20">
-          <div className="glass max-w-sm w-full p-6 rounded-3xl relative border-accent/30 shadow-glow overflow-y-auto max-h-[90vh]">
+          <div className="bg-[#0c101c] border border-white/10 max-w-sm w-full p-5 rounded-2xl relative shadow-2xl overflow-y-auto max-h-[90vh]">
             <button 
               onClick={() => setSelectedCell(null)}
-              className="absolute top-4 right-4 text-white/40 hover:text-white"
+              className="absolute top-4 right-4 text-white/40 hover:text-white transition-colors"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
             <div className="flex items-start justify-between mb-4">
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <h2 className="text-xl font-black italic tracking-tighter">CELL {selectedCell.cell_id}</h2>
-                  <div className="bg-accent/10 border border-accent/30 px-1.5 py-0.5 rounded text-[8px] font-black text-accent tracking-[0.2em] animate-pulse">PINN AI ACTIVE</div>
+                  <h2 className="text-base font-semibold text-white/90">Cell {selectedCell.cell_id}</h2>
+                  <span className="bg-white/5 border border-white/10 px-1.5 py-0.5 rounded text-[9px] font-mono text-white/60 tracking-wider">PINN AI</span>
                 </div>
-                <p className="text-[10px] opacity-50 font-bold uppercase tracking-widest">{selectedCell.center_lat}, {selectedCell.center_lon}</p>
+                <p className="text-[10px] text-white/40 font-mono tracking-wider">{selectedCell.center_lat}, {selectedCell.center_lon}</p>
               </div>
               <RiskBadge level={selectedCell.risk_level} score={selectedCell.risk_score} />
             </div>
 
-            {/* FoS Warning for failing cells */}
+            {/* Warning for high risk cells */}
             {selectedCell.fos_seismic < 1.0 && (
-              <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-risk-red/10 border border-risk-red/40 rounded-xl">
-                <AlertTriangle className="w-4 h-4 text-risk-red shrink-0" />
-                <p className="text-[10px] font-black text-risk-red uppercase tracking-widest">
-                  FoS {selectedCell.fos_seismic.toFixed(2)} — SLOPE FAILURE IMMINENT
+              <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-lg">
+                <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+                <p className="text-[10px] font-semibold text-red-300 font-mono tracking-wider">
+                  FoS {selectedCell.fos_seismic.toFixed(2)} — VERY HIGH RISK AREA
                 </p>
               </div>
             )}
 
-            <div className="space-y-2 mb-6">
-              <div className="p-3 bg-white/5 rounded-xl border border-accent/10">
-                <p className="text-[10px] font-black text-accent uppercase tracking-widest mb-1">Top Risk Factor</p>
-                <p className="text-sm font-bold uppercase">{selectedCell.top_risk_factor.replace('_',' ')}</p>
+            <div className="space-y-2 mb-4">
+              <div className="p-3 bg-white/[0.02] rounded-lg border border-white/5">
+                <p className="text-[9px] text-white/40 uppercase tracking-wider mb-0.5">Top Risk Factor</p>
+                <p className="text-xs font-semibold text-white/90 uppercase">{selectedCell.top_risk_factor.replace('_',' ')}</p>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 {[
                   { label: 'Slope',    val: selectedCell.slope_mean + '°' },
-                  { label: 'Elev',     val: selectedCell.elevation_mean + 'm' },
-                  { label: 'Rain 24h', val: selectedCell.rainfall_24h + 'mm' },
-                  { label: 'Moisture', val: Math.round(selectedCell.soil_moisture * 100) + '%' }
+                  { label: 'Elevation', val: selectedCell.elevation_mean + 'm' },
+                  { label: 'Rain (24h)', val: selectedCell.rainfall_24h + 'mm' },
+                  { label: 'Soil Moisture', val: Math.round(selectedCell.soil_moisture * 100) + '%' }
                 ].map(stat => (
-                  <div key={stat.label} className="bg-white/3 p-2 rounded-lg border border-white/5">
-                    <p className="text-[8px] font-black opacity-30 uppercase">{stat.label}</p>
-                    <p className="text-xs font-bold font-mono">{stat.val}</p>
+                  <div key={stat.label} className="bg-white/[0.02] p-2 rounded-lg border border-white/5">
+                    <p className="text-[8px] font-mono text-white/30 uppercase">{stat.label}</p>
+                    <p className="text-xs font-medium text-white/80 font-mono">{stat.val}</p>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Runout analysis — only for failing slopes */}
+            {/* Runout analysis — only for high risk slopes */}
             {(selectedCell.fos_seismic < 1.0 || selectedCell.risk_level === 'RED') && (
               <RunoutPanel runoutData={activeRunout} cell={selectedCell} />
             )}
 
-            <button className="w-full mt-4 bg-accent text-bg font-black py-3 rounded-xl hover:scale-[1.02] transition-all flex items-center justify-center gap-2">
-              <Route className="w-5 h-5" />
-              GET SAFE ROUTE FROM HERE
+            <button className="w-full mt-4 bg-white/10 hover:bg-white/15 border border-white/15 text-white text-xs font-medium py-2.5 rounded-lg transition-all flex items-center justify-center gap-2">
+              <Route className="w-4 h-4 text-white/60" />
+              Get Safe Route From Here
             </button>
           </div>
         </div>

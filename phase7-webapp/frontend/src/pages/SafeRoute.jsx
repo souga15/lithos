@@ -1,7 +1,13 @@
-import React, { useState, useEffect, Suspense } from 'react';
-import { MapContainer, TileLayer, Polyline, Marker, Popup, useMapEvents, GeoJSON, Polygon, useMap } from 'react-leaflet';
+import React, { useState, useEffect, Suspense, useRef } from 'react';
+import { MapContainer, TileLayer, Polyline, Marker, Popup, useMapEvents, Polygon } from 'react-leaflet';
 import HeatmapLayer from '../components/HeatmapLayer';
-import { Route as RouteIcon, AlertTriangle, Search, Navigation, Map as MapIcon, Layers, Globe, Loader2, MapPin, X, ArrowUpDown, Play, Pause, RotateCcw, Volume2, VolumeX, Sparkles, ChevronRight, Compass, Gauge, SlidersHorizontal } from 'lucide-react';
+import {
+  Route as RouteIcon, AlertTriangle, Search, Navigation, Map as MapIcon, Layers, Globe,
+  Loader2, MapPin, X, ArrowUpDown, Play, Pause, RotateCcw, Volume2, VolumeX, Sparkles,
+  ChevronRight, Compass, Gauge, SlidersHorizontal, ArrowUpRight, ArrowUpLeft, ArrowUp,
+  CornerUpRight, CornerUpLeft, Split, Flag, ShieldCheck, ShieldAlert, Zap, CheckCircle2,
+  ChevronDown, ArrowRight, Eye, Shield
+} from 'lucide-react';
 import L from 'leaflet';
 import axios from 'axios';
 import API_BASE_URL from '../apiConfig';
@@ -10,6 +16,68 @@ import RiskBadge from '../components/RiskBadge';
 import SOSButton from '../components/SOSButton';
 import BlockageReport from '../components/BlockageReport';
 import RainfallClock from '../components/RainfallClock';
+
+// ── Regional Authentic Destination Landmarks & Strategic Passes ─────────────
+const REGIONAL_LANDMARKS = {
+  sikkim: [
+    { name: "Gangtok (MG Marg)", lat: 27.3290, lng: 88.6123, tag: "City Center" },
+    { name: "Nathu La Pass (4,310m)", lat: 27.3868, lng: 88.8309, tag: "Strategic Pass" },
+    { name: "Tsomgo / Changu Lake", lat: 27.3742, lng: 88.7618, tag: "High Alpine Lake" },
+    { name: "Singtam Highway Junction", lat: 27.2340, lng: 88.4980, tag: "NH-10 Arterial" },
+    { name: "Dikchu Teesta Bridge", lat: 27.3995, lng: 88.5298, tag: "Teesta Crossing" },
+    { name: "Mangan Dzong (North)", lat: 27.5080, lng: 88.5320, tag: "District Capital" },
+    { name: "Rangpo Border Post", lat: 27.1764, lng: 88.5302, tag: "State Border" },
+  ],
+  cherrapunji: [
+    { name: "Shillong Police Bazar", lat: 25.5788, lng: 91.8933, tag: "Capital Center" },
+    { name: "Sohra (Cherra Eco Park)", lat: 25.2702, lng: 91.7323, tag: "Rainfall Scarp" },
+    { name: "Dawki Border Checkpost", lat: 25.1870, lng: 92.0190, tag: "Border Gate" },
+    { name: "Umiam Lake Dam Link", lat: 25.6560, lng: 91.9050, tag: "Reservoir Link" },
+    { name: "Mawlynnong Eco Village", lat: 25.2015, lng: 91.9160, tag: "Canyon Trail" },
+    { name: "Nongpoh Highway Post", lat: 25.9010, lng: 91.8810, tag: "Assam Corridor" },
+  ],
+  manipur_nh2: [
+    { name: "Imphal Kangla Fort", lat: 24.8170, lng: 93.9368, tag: "Capital Gateway" },
+    { name: "Kohima War Cemetery", lat: 25.6701, lng: 94.1077, tag: "Ridge Highway" },
+    { name: "Senapati Valley Corridor", lat: 25.2670, lng: 94.0180, tag: "Valley Arterial" },
+    { name: "Dimapur Railhead Gate", lat: 25.9060, lng: 93.7270, tag: "Transit Hub" },
+    { name: "Maram Hill Station", lat: 25.4300, lng: 94.0600, tag: "High Pass" },
+  ],
+  arunachal_w: [
+    { name: "Itanagar Raj Bhavan", lat: 27.0844, lng: 93.6053, tag: "Capital Post" },
+    { name: "Bhalukpong Gate", lat: 27.0120, lng: 92.6410, tag: "Entry Corridor" },
+    { name: "Bomdila Pass Approach", lat: 27.2645, lng: 92.4230, tag: "Strategic Ridge" },
+    { name: "Dirang Valley Link", lat: 27.3590, lng: 92.2350, tag: "River Valley" },
+  ],
+  nagaland: [
+    { name: "Kohima Town Center", lat: 25.6701, lng: 94.1077, tag: "Capital Ridge" },
+    { name: "Dimapur City Junction", lat: 25.9060, lng: 93.7270, tag: "Plains Link" },
+    { name: "Mokokchung Ridge Post", lat: 26.3250, lng: 94.5200, tag: "Highland" },
+    { name: "Wokha Highland Link", lat: 26.1000, lng: 94.2600, tag: "Mountain Pass" },
+  ],
+  wayanad: [
+    { name: "Kalpetta District Center", lat: 11.6090, lng: 76.0820, tag: "Center" },
+    { name: "Meppadi Tea Estate Link", lat: 11.5510, lng: 76.1280, tag: "Valley Road" },
+    { name: "Chooralmala Scarp", lat: 11.5320, lng: 76.1680, tag: "Scarp Zone" },
+    { name: "Vythiri Ghat Pass", lat: 11.5520, lng: 76.0420, tag: "Ghat Link" },
+    { name: "Sultan Bathery Gate", lat: 11.6620, lng: 76.2570, tag: "State Post" },
+  ],
+  assam_hills: [
+    { name: "Haflong Hill Station", lat: 25.1764, lng: 93.0238, tag: "District Center" },
+    { name: "Lumding Junction Link", lat: 25.7500, lng: 93.1700, tag: "Rail Corridor" },
+    { name: "Maibang River Valley", lat: 25.3000, lng: 93.1600, tag: "Valley Link" },
+  ],
+  mizoram: [
+    { name: "Aizawl City Center", lat: 23.7271, lng: 92.7176, tag: "Ridge City" },
+    { name: "Sairang Rail Terminal", lat: 23.8050, lng: 92.6570, tag: "Transport Hub" },
+    { name: "Lunglei South Post", lat: 22.8800, lng: 92.7400, tag: "Ridge Highway" },
+  ],
+  tripura: [
+    { name: "Agartala Capital Hub", lat: 23.8315, lng: 91.2868, tag: "Capital Link" },
+    { name: "Dharmanagar Post", lat: 24.3800, lng: 92.1700, tag: "North Arterial" },
+    { name: "Jampui Hills Range", lat: 23.9500, lng: 92.2800, tag: "Border Ridge" },
+  ]
+};
 
 // ── Demo Presets for Academic / Evaluation Presentation ───────────────────────
 const DEMO_PRESETS = [
@@ -48,6 +116,22 @@ const DEMO_PRESETS = [
   },
 ];
 
+// Helper: Calculate forward heading in degrees (0..360, North=0)
+const calculateBearing = (lat1, lon1, lat2, lon2) => {
+  const y = Math.sin((lon2 - lon1) * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180);
+  const x = Math.cos(lat1 * Math.PI / 180) * Math.sin(lat2 * Math.PI / 180) -
+            Math.sin(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.cos((lon2 - lon1) * Math.PI / 180);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+};
+
+const formatDuration = (mins) => {
+  if (!mins) return '0 min';
+  const h = Math.floor(mins / 60);
+  const m = Math.round(mins % 60);
+  if (h > 0) return `${h} hr ${m > 0 ? `${m} min` : ''}`;
+  return `${m} min`;
+};
+
 // CesiumTerrain3D loaded lazily so 2D map still works if cesium pkg not yet installed
 const CesiumTerrain3DLazy = React.lazy(() =>
   import('../components/CesiumTerrain3D').catch((err) => {
@@ -56,15 +140,11 @@ const CesiumTerrain3DLazy = React.lazy(() =>
       default: () => (
         <div style={{ display:'flex', alignItems:'center', justifyContent:'center',
           height:'100%', flexDirection:'column', gap:12, background:'#050d1e' }}>
-        <p style={{ color:'#FF9500', fontSize:13, fontWeight:900, letterSpacing:'0.15em', fontFamily:'monospace' }}>
-          ⚠ 3D TERRAIN UNAVAILABLE
-        </p>
-        <p style={{ color:'rgba(255,255,255,0.4)', fontSize:11, fontWeight:700, textAlign:'center', maxWidth:320 }}>
-          Run this in the frontend folder:<br/>
-          <code style={{ color:'#00C2FF' }}>npm install resium cesium vite-plugin-cesium --legacy-peer-deps</code>
-        </p>
-      </div>
-    )
+          <p style={{ color:'#FF9500', fontSize:13, fontWeight:900, letterSpacing:'0.15em', fontFamily:'monospace' }}>
+            ⚠ 3D TERRAIN UNAVAILABLE
+          </p>
+        </div>
+      )
     };
   })
 );
@@ -75,6 +155,7 @@ const SafeRoute = () => {
   const [start, setStart] = useState(null);
   const [end, setEnd] = useState(null);
   const [routeResult, setRouteResult] = useState(null);
+  const [selectedRouteIdx, setSelectedRouteIdx] = useState(0); // 0: Safe, 1: Moderate, 2: Danger
   const [loading, setLoading] = useState(false);
   const [riskGrid, setRiskGrid] = useState(null);
   const [activeRunouts, setActiveRunouts] = useState([]);
@@ -88,40 +169,41 @@ const SafeRoute = () => {
   const [startQuery, setStartQuery] = useState('');
   const [endQuery, setEndQuery] = useState('');
   const [focusPoint, setFocusPoint] = useState(null);
+  const [clickTarget, setClickTarget] = useState('auto'); // 'auto' | 'origin' | 'destination'
 
   // Navigation State
   const [isNavigating, setIsNavigating] = useState(false);
+  const [isDrivingMode, setIsDrivingMode] = useState(false);
   const [navIndex, setNavIndex] = useState(0);
   const [carPosition, setCarPosition] = useState(null);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [isOffRoute, setIsOffRoute] = useState(false);
-  const prevRisk = React.useRef('GREEN');
-  const lastProximityCheck = React.useRef({ lat: 0, lng: 0, time: 0 });
-  const lastAlertedHazard = React.useRef(null);
+  const prevRisk = useRef('GREEN');
+  const lastProximityCheck = useRef({ lat: 0, lng: 0, time: 0 });
+  const lastAlertedHazard = useRef(null);
   const [showCertificate, setShowCertificate] = useState(false);
-  const [mapStyle, setMapStyle]       = useState(() => localStorage.getItem('lithos_mapstyle') || '3d');
+  const [mapStyle, setMapStyle] = useState(() => localStorage.getItem('lithos_mapstyle') || '3d');
   const [nearbyHazards, setNearbyHazards] = useState([]);
-  const [liveUsers,    setLiveUsers]   = useState([]);
+  const [liveUsers, setLiveUsers] = useState([]);
   const [showEvacuation, setShowEvacuation] = useState(false);
-  const sessionId = React.useRef(`lithos_${Math.random().toString(36).slice(2)}`);
+  const sessionId = useRef(`lithos_${Math.random().toString(36).slice(2)}`);
 
-  // ── Demo Presentation State ──
-  const [isDemoMode, setIsDemoMode] = useState(false);
-  const [demoSpeed, setDemoSpeed] = useState(4); // 4x or 10x
-  const [isDemoPlaying, setIsDemoPlaying] = useState(false);
-  const [demoMuted, setDemoMuted] = useState(true);
+  // ── Driving Simulation State ──
+  const [demoSpeed, setDemoSpeed] = useState(3); // 1x, 3x, 8x
+  const [isDemoPlaying, setIsDemoPlaying] = useState(true);
+  const [demoMuted, setDemoMuted] = useState(false);
   const [show2DToolsDrawer, setShow2DToolsDrawer] = useState(false);
-  const demoTimerRef = React.useRef(null);
+  const demoTimerRef = useRef(null);
+  const wakeLockRef = useRef(null);
 
-
-  // Screen Wake Lock Reference
-  const wakeLockRef = React.useRef(null);
+  // Derive the active route (selected by user: Safe, Moderate, or Danger)
+  const activeRoute = routeResult?.routes
+    ? (routeResult.routes[selectedRouteIdx] || routeResult.routes[0])
+    : routeResult?.route;
 
   const requestWakeLock = async () => {
     try {
-      if ('wakeLock' in navigator) {
-        wakeLockRef.current = await navigator.wakeLock.request('screen');
-      }
+      if ('wakeLock' in navigator) wakeLockRef.current = await navigator.wakeLock.request('screen');
     } catch (err) { console.log('Wake lock failed', err); }
   };
 
@@ -132,13 +214,15 @@ const SafeRoute = () => {
     }
   };
 
-  // Voice Synthesis Helper
   const speak = (text) => {
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'en-IN';
-    utterance.rate = 0.9;
-    window.speechSynthesis.speak(utterance);
+    if (demoMuted) return;
+    try {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'en-IN';
+      utterance.rate = 0.95;
+      window.speechSynthesis.speak(utterance);
+    } catch (_) {}
   };
 
   useEffect(() => {
@@ -147,21 +231,14 @@ const SafeRoute = () => {
       const cached = localStorage.getItem('active_route_full');
       if (cached) {
         const parsed = JSON.parse(cached);
-        // Only restore if high-resolution road route (or short corridor like wayanad)
-        if (parsed.route?.segments?.length > 300) {
+        if (parsed.routes?.length || parsed.route?.segments?.length > 100) {
           setRouteResult(parsed);
-        } else {
-          localStorage.removeItem('active_route_full');
         }
       }
     } catch (e) { console.error("Cache load failed", e); }
-
-    // Always clear the speech queue when this page loads or unloads
-    window.speechSynthesis.cancel();
     return () => window.speechSynthesis.cancel();
   }, []);
 
-  // Load risk grid and active runout zones whenever the region changes
   useEffect(() => {
     if (selectedRegion?.key) {
       fetchRiskGrid(selectedRegion);
@@ -169,7 +246,6 @@ const SafeRoute = () => {
     }
   }, [selectedRegion?.key]);
 
-  // Fetch weather separately when region changes or connection returns
   useEffect(() => {
     if (selectedRegion && !isOffline) {
       fetchLiveWeather(selectedRegion.key);
@@ -179,131 +255,43 @@ const SafeRoute = () => {
   useEffect(() => {
     const handleOnline = () => {
       setIsOffline(false);
-      if (navigator.geolocation && !isNavigating) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-            console.log("Network restored. Current GPS location:", loc);
-            // Only sync start point if we aren't already navigating a route!
-            setStart(prev => prev || loc);
-            setStartQuery(prev => prev || 'Current GPS Location');
-            if (isNavigating) speak("Network restored. Connection active.");
-          },
-          (err) => console.log("GPS Error:", err),
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 } // Requests hybrid GPS + Cell Tower / Wi-Fi
-        );
-      } else {
-        if (isNavigating) speak("Network restored. Live alerts resumed.");
-      }
+      speak("Network connectivity restored.");
     };
     const handleOffline = () => {
       setIsOffline(true);
-      if (isNavigating) speak("Connection lost. Operating in offline mode.");
+      speak("Network connection lost. Offline cached mode active.");
     };
-
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [isNavigating]);
-
-  useEffect(() => {
-    // Setup Websockets for live driving mode updates only when online
-    if (!isOffline) {
-      const wsBase = API_BASE_URL.replace('http', 'ws');
-      const wsAlerts = new WebSocket(`${wsBase}/ws/alerts`);
-      wsAlerts.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        if (data.type !== 'connected') setActiveAlert(data);
-      };
-
-      const wsReports = new WebSocket(`${wsBase}/ws/reports`);
-      wsReports.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        if (data.type !== 'connected') {
-          setLatestReport(data);
-          
-          // Voice alerts temporarily disabled by user request
-          // if (isNavigating) {
-          //   speak(`Community alert — ${(data.report_type || 'hazard').replace(/_/g, ' ')} reported ahead.`);
-          // }
-          
-          // Automatically hide report popup after 10 seconds
-          setTimeout(() => setLatestReport(null), 10000);
-        }
-      };
-
-      return () => {
-        wsAlerts.close();
-        wsReports.close();
-      };
-    }
-  }, [isOffline, isNavigating]);
-
-  // ── Live user positions: subscribe + broadcast ────────────────────────────
-  useEffect(() => {
-    if (isOffline) return;
-    const wsBase = API_BASE_URL.replace('http', 'ws');
-    let ws;
-    try {
-      ws = new WebSocket(`${wsBase}/ws/users`);
-      ws.onmessage = (e) => {
-        const d = JSON.parse(e.data);
-        if (d.type === 'positions') setLiveUsers(d.users || []);
-      };
-    } catch (_) {}
-    return () => ws?.close();
-  }, [isOffline]);
-
-  // Broadcast own position every 5s during navigation
-  useEffect(() => {
-    if (!isNavigating || !carPosition || isOffline) return;
-    const id = setInterval(() => {
-      axios.post(`${API_BASE_URL}/api/users/position`, {
-        session_id: sessionId.current,
-        lat:  carPosition.lat,
-        lon:  carPosition.lng,
-        risk: carPosition.risk || 'GREEN',
-      }).catch(() => {});
-    }, 5000);
-    return () => clearInterval(id);
-  }, [isNavigating, carPosition, isOffline]);
-
+  }, []);
 
   const fetchLiveWeather = async (key) => {
     try {
       const resp = await axios.get(`${API_BASE_URL}/api/weather/live?region=${key}`);
       setWeather(resp.data);
-      try {
-        localStorage.setItem(`weather_cache_${key}`, JSON.stringify(resp.data));
-      } catch (e) {
-        console.warn('LocalStorage quota exceeded for weather');
-      }
-    } catch (err) {
-      const cached = localStorage.getItem(`weather_cache_${key}`);
-      if (cached) setWeather(JSON.parse(cached));
-    }
+    } catch (_) {}
   };
 
   const fetchRegions = async () => {
     try {
       const resp = await axios.get(`${API_BASE_URL}/api/regions`);
       setRegions(resp.data.regions);
-      setSelectedRegion(resp.data.regions[0]);
-      try {
-        localStorage.setItem('regions_cache', JSON.stringify(resp.data.regions));
-      } catch (e) {
-        console.warn('LocalStorage quota exceeded for regions');
+      const defReg = resp.data.regions.find(r => r.key === 'sikkim') || resp.data.regions[0];
+      setSelectedRegion(defReg);
+      // Set default Sikkim landmark pair
+      const sikkimMarks = REGIONAL_LANDMARKS['sikkim'];
+      if (sikkimMarks && sikkimMarks.length >= 2) {
+        setStart({ lat: sikkimMarks[0].lat, lng: sikkimMarks[0].lng });
+        setStartQuery(sikkimMarks[0].name);
+        setEnd({ lat: sikkimMarks[1].lat, lng: sikkimMarks[1].lng });
+        setEndQuery(sikkimMarks[1].name);
       }
     } catch (err) {
-      const cached = localStorage.getItem('regions_cache');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        setRegions(parsed);
-        setSelectedRegion(parsed[0]);
-      }
+      console.error(err);
     }
   };
 
@@ -312,12 +300,8 @@ const SafeRoute = () => {
     if (!reg?.key) return;
     try {
       const resp = await axios.get(`${API_BASE_URL}/api/risk-grid?region=${reg.key}`);
-      if (resp.data && resp.data.features) {
-        setRiskGrid(resp.data);
-      }
-    } catch (e) {
-      console.warn("Failed to load risk grid for region:", reg.key, e);
-    }
+      if (resp.data && resp.data.features) setRiskGrid(resp.data);
+    } catch (_) {}
   };
 
   const fetchActiveRunouts = async (regionKey) => {
@@ -325,14 +309,66 @@ const SafeRoute = () => {
     try {
       const resp = await axios.get(`${API_BASE_URL}/api/active-runouts?region=${regionKey}`);
       setActiveRunouts(resp.data || []);
+    } catch (_) {}
+  };
+
+  const searchLocation = async (query, setPoint, setQueryStr) => {
+    if (!query || !query.trim()) return;
+    const q = query.trim().toLowerCase();
+
+    // 1. Check coordinates (e.g. "27.329, 88.612")
+    const coordMatch = q.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
+    if (coordMatch) {
+      const lat = parseFloat(coordMatch[1]);
+      const lng = parseFloat(coordMatch[2]);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        const pt = { lat, lng };
+        setPoint(pt);
+        setFocusPoint(pt);
+        return;
+      }
+    }
+
+    // 2. Fast lookup against strategic mountain landmarks across regions
+    for (const regKey of Object.keys(REGIONAL_LANDMARKS)) {
+      const found = REGIONAL_LANDMARKS[regKey].find(lm =>
+        lm.name.toLowerCase().includes(q) || q.includes(lm.name.toLowerCase().split(' ')[0])
+      );
+      if (found) {
+        const pt = { lat: found.lat, lng: found.lng };
+        setPoint(pt);
+        setQueryStr(found.name);
+        setFocusPoint(pt);
+        return;
+      }
+    }
+
+    // 3. Query OpenStreetMap Nominatim for accurate real-world place/address in India
+    try {
+      const resp = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', India')}&limit=1`
+      );
+      const data = await resp.json();
+      if (data && data.length > 0) {
+        const lat = parseFloat(data[0].lat);
+        const lng = parseFloat(data[0].lon);
+        const pt = { lat, lng };
+        setPoint(pt);
+        setQueryStr(data[0].display_name.split(',')[0]);
+        setFocusPoint(pt);
+      } else {
+        alert(`Location "${query}" not found. Try entering a city or click directly on the map.`);
+      }
     } catch (e) {
-      console.warn("Failed to load active runouts for region:", regionKey, e);
-      setActiveRunouts([]);
+      console.warn("Geocoding failed:", e);
     }
   };
 
   const calculateRoute = async () => {
-    if (!start || !end || !selectedRegion) return;
+    if (!start || !end) {
+      alert("Please select both Origin and Destination waypoints.");
+      return;
+    }
     setLoading(true);
     try {
       const resp = await axios.post(`${API_BASE_URL}/api/route`, {
@@ -340,187 +376,86 @@ const SafeRoute = () => {
         start_lon: start.lng,
         end_lat: end.lat,
         end_lon: end.lng,
-        region: selectedRegion.key // Passed for legacy UI state logging, but backend now uses global coords
+        region: selectedRegion?.key || 'multi'
       });
       setRouteResult(resp.data);
-      try {
-        localStorage.setItem('active_route_full', JSON.stringify(resp.data));
-      } catch (e) {
-        console.warn('LocalStorage quota exceeded for active_route_full');
-      }
-    } catch (err) {
-      console.error(err);
-      if (!err.response) {
-        alert('Connection Error: Cannot reach LITHOS Backend API (Port 8000). Please ensure the backend is running.');
-      } else {
-        alert(err.response?.data?.detail || 'Error calculating route. Please ensure points are within the selected region.');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ── Load Demo Preset ──────────────────────────────────────────────────────
-  const loadDemoPreset = async (preset) => {
-    const reg = regions.find(r => r.key === preset.regionKey) || regions[0] || { key: preset.regionKey, name: preset.name };
-    setSelectedRegion(reg);
-    setStart(preset.start);
-    setStartQuery(preset.startLabel);
-    setEnd(preset.end);
-    setEndQuery(preset.endLabel);
-    setFocusPoint(preset.start);
-    setLoading(true);
-
-    try {
-      const resp = await axios.post(`${API_BASE_URL}/api/route`, {
-        start_lat: preset.start.lat,
-        start_lon: preset.start.lng,
-        end_lat: preset.end.lat,
-        end_lon: preset.end.lng,
-        region: reg.key
-      });
-      setRouteResult(resp.data);
+      setSelectedRouteIdx(0);
       setNavIndex(0);
-      const firstSeg = resp.data.route?.segments?.[0];
-      setCarPosition({
-        lat: preset.start.lat,
-        lng: preset.start.lng,
-        risk: firstSeg ? firstSeg.risk_level : 'GREEN'
-      });
+      const r0 = resp.data.routes ? resp.data.routes[0] : resp.data.route;
+      const firstSeg = r0?.segments?.[0];
+      if (firstSeg) {
+        setCarPosition({
+          lat: firstSeg.lat,
+          lng: firstSeg.lon ?? firstSeg.lng,
+          risk: firstSeg.risk_level || 'GREEN',
+          slope: firstSeg.slope_mean ?? 14,
+          fos: firstSeg.fos_seismic ?? 1.5,
+          heading: 0
+        });
+      }
       try {
         localStorage.setItem('active_route_full', JSON.stringify(resp.data));
       } catch (_) {}
     } catch (err) {
-      console.error("Demo route error:", err);
-      alert('Error fetching demo corridor route. Please try again.');
+      console.error(err);
+      alert(err.response?.data?.detail || 'Error calculating routes. Please try different waypoints.');
     } finally {
       setLoading(false);
     }
   };
 
-  // ── Start Demo Simulation (4x / 10x Speed) ────────────────────────────────
-  const startDemoSimulation = (speed = demoSpeed) => {
-    if (!routeResult || !routeResult.route?.segments?.length) return;
-    setIsNavigating(true);
-    setIsDemoMode(true);
-    setIsDemoPlaying(true);
-    setDemoSpeed(speed);
-    setNavIndex(0);
-    const firstSeg = routeResult.route.segments[0];
-    setCarPosition({
-      lat: firstSeg.lat,
-      lng: firstSeg.lon ?? firstSeg.lng,
-      risk: firstSeg.risk_level || 'GREEN'
-    });
-    if (!demoMuted) speak(`Starting corridor presentation at ${speed}x real-time speed.`);
+  const handleLandmarkSelect = (lm, asOrigin = false) => {
+    const point = { lat: lm.lat, lng: lm.lng };
+    if (asOrigin) {
+      setStart(point);
+      setStartQuery(lm.name);
+      setFocusPoint(point);
+    } else {
+      setEnd(point);
+      setEndQuery(lm.name);
+      setFocusPoint(point);
+      // If start is already set, auto calculate!
+      if (start) {
+        setRouteResult(null);
+      }
+    }
   };
 
   const handleSearch = async (query, setPointFunc, setQueryFunc) => {
     if (!query) return;
     try {
-      const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&q=${query}&limit=1`);
+      const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`);
       if (res.data && res.data.length > 0) {
         const { lat, lon, display_name } = res.data[0];
         const newPoint = { lat: parseFloat(lat), lng: parseFloat(lon) };
         setPointFunc(newPoint);
         setQueryFunc(display_name.split(',')[0]);
         setFocusPoint(newPoint);
-
-        // Auto-select the closest region if within coverage range
-        if (regions && regions.length > 0) {
-          const closestReg = regions.reduce((best, r) => {
-            if (!r.center) return best;
-            const dist = Math.hypot(r.center[0] - newPoint.lat, r.center[1] - newPoint.lng);
-            return (!best || dist < best.dist) ? { reg: r, dist } : best;
-          }, null);
-          if (closestReg && closestReg.dist < 1.8 && selectedRegion?.key !== closestReg.reg.key) {
-            setSelectedRegion(closestReg.reg);
-          }
-        }
       } else {
-        alert("Location not found");
+        alert("Location not found. Please try another query or click on the map.");
       }
     } catch (err) {
       console.error("Geocoding error", err);
     }
   };
 
-  const getClosestSegmentIndex = (lat, lng, segments) => {
-    let minDistance = Infinity;
-    let closestIndex = 0;
-    const currentPoint = L.latLng(lat, lng);
-    segments.forEach((seg, i) => {
-      const dist = currentPoint.distanceTo(L.latLng(seg.lat, seg.lon));
-      if (dist < minDistance) {
-        minDistance = dist;
-        closestIndex = i;
-      }
-    });
-    return { index: closestIndex, distance: minDistance };
-  };
-
-  // ── Standard GPS Tracking (Active ONLY when NOT in Demo Simulation) ──────
-  useEffect(() => {
-    let watchId;
-    if (isNavigating && !isDemoMode && routeResult && routeResult.route.segments.length > 0) {
-      speak("Starting live navigation. Please ensure your map area is loaded before entering offline regions.");
-      requestWakeLock();
-
-      watchId = navigator.geolocation.watchPosition(
-        (pos) => {
-          const { latitude, longitude } = pos.coords;
-          const { index, distance } = getClosestSegmentIndex(latitude, longitude, routeResult.route.segments);
-
-          if (distance > 150) {
-            if (!isOffRoute) {
-              setIsOffRoute(true);
-              speak("You are off route. Please return to the safe path.");
-            }
-          } else {
-            setIsOffRoute(false);
-          }
-
-          setNavIndex(index);
-          const currentSeg = routeResult.route.segments[index];
-          setCarPosition({ lat: latitude, lng: longitude, risk: currentSeg ? currentSeg.risk_level : 'GREEN' });
-
-          if (index >= routeResult.route.segments.length - 1 && distance < 50) {
-            if (watchId) navigator.geolocation.clearWatch(watchId);
-            setIsNavigating(false);
-            setShowCertificate(true);
-            speak("You have reached your destination securely.");
-          }
-        },
-        (err) => {
-          console.error("GPS Tracking Error:", err);
-          speak("GPS signal lost. Attempting to track network position.");
-        },
-        { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
-      );
-    } else {
-      releaseWakeLock();
-    }
-    return () => {
-      releaseWakeLock();
-      if (watchId) navigator.geolocation.clearWatch(watchId);
-    };
-  }, [isNavigating, isDemoMode, routeResult]);
-
-  // ── Demo Presentation Playback Engine (4x / 10x speed) ───────────────────
+  // ── Driving Simulation Movement Engine ─────────────────────────────────────
   useEffect(() => {
     clearInterval(demoTimerRef.current);
 
-    if (isDemoMode && isNavigating && isDemoPlaying && routeResult && routeResult.route?.segments?.length) {
-      const segments = routeResult.route.segments;
-      // 4x speed = ~220ms per road segment. 10x speed = ~80ms per road segment.
-      const intervalMs = demoSpeed === 10 ? 80 : demoSpeed === 4 ? 220 : 800;
+    if (isNavigating && isDemoPlaying && activeRoute?.segments?.length) {
+      const segments = activeRoute.segments;
+      // 1x = ~500ms per waypoint (realistic mountain pace)
+      // 3x = ~160ms per waypoint
+      // 8x = ~65ms per waypoint
+      const intervalMs = demoSpeed === 8 ? 65 : demoSpeed === 3 ? 160 : 500;
 
       demoTimerRef.current = setInterval(() => {
         setNavIndex((prevIdx) => {
-          const stepSize = demoSpeed === 10
-            ? Math.max(1, Math.round(segments.length / 280))
-            : demoSpeed === 4
-            ? Math.max(1, Math.round(segments.length / 550))
+          const stepSize = demoSpeed === 8
+            ? Math.max(1, Math.round(segments.length / 320))
+            : demoSpeed === 3
+            ? Math.max(1, Math.round(segments.length / 700))
             : 1;
 
           const nextIdx = prevIdx + stepSize;
@@ -528,82 +463,92 @@ const SafeRoute = () => {
             clearInterval(demoTimerRef.current);
             setIsDemoPlaying(false);
             setShowCertificate(true);
-            if (!demoMuted) speak("Demonstration complete. Vehicle reached destination safely.");
+            speak("Destination reached securely. Corridor inspection complete.");
             return segments.length - 1;
           }
-          const seg = segments[nextIdx];
+
+          const curr = segments[nextIdx];
+          const next = segments[Math.min(nextIdx + 1, segments.length - 1)];
+          const heading = (curr && next && nextIdx < segments.length - 1)
+            ? calculateBearing(curr.lat, curr.lon ?? curr.lng, next.lat, next.lon ?? next.lng)
+            : (carPosition?.heading || 0);
+
           setCarPosition({
-            lat: seg.lat,
-            lng: seg.lon ?? seg.lng,
-            risk: seg.risk_level || 'GREEN'
+            lat: curr.lat,
+            lng: curr.lon ?? curr.lng,
+            risk: curr.risk_level || 'GREEN',
+            slope: curr.slope_mean ?? 14.2,
+            fos: curr.fos_seismic ?? 1.55,
+            heading: Math.round(heading)
           });
+
           return nextIdx;
         });
       }, intervalMs);
     }
 
     return () => clearInterval(demoTimerRef.current);
-  }, [isDemoMode, isNavigating, isDemoPlaying, demoSpeed, routeResult, demoMuted]);
+  }, [isNavigating, isDemoPlaying, demoSpeed, activeRoute, demoMuted]);
 
-  // Proximity Alerts for critical slopes
+  // Voice announcements for risk zones
   useEffect(() => {
-    if (!isNavigating || !carPosition) return;
-    if (isOffline) { setNearbyHazards([]); return; }
-
-    const now = Date.now();
-    const distSinceLast = L.latLng(carPosition.lat, carPosition.lng).distanceTo(L.latLng(lastProximityCheck.current.lat, lastProximityCheck.current.lng));
-
-    // Check every 500m or every 30 seconds
-    if (distSinceLast > 500 || (now - lastProximityCheck.current.time) > 30000) {
-      lastProximityCheck.current = { lat: carPosition.lat, lng: carPosition.lng, time: now };
-
-      axios.get(`${API_BASE_URL}/api/proximity-alerts?lat=${carPosition.lat}&lon=${carPosition.lng}&radius=6`)
-        .then(res => {
-          const hazards = res.data.hazards || [];
-          // Store top 3 hazards in state for visual display
-          setNearbyHazards(hazards.slice(0, 3));
-
-          if (hazards.length > 0) {
-            const topHazard = hazards[0];
-            if (topHazard.distance_km >= 2 && topHazard.distance_km <= 6) {
-              if (lastAlertedHazard.current !== topHazard.cell_id) {
-                speak(`Caution: Critical slope detected ${topHazard.distance_km} kilometers to your ${topHazard.direction}.`);
-                lastAlertedHazard.current = topHazard.cell_id;
-              }
-            }
-          } else {
-            lastAlertedHazard.current = null;
-          }
-        })
-        .catch(err => console.error("Proximity check failed", err));
-    }
-  }, [carPosition, isNavigating, isOffline]);
-
-  useEffect(() => {
-    if (isNavigating && routeResult && routeResult.route.segments[navIndex]) {
-      const seg = routeResult.route.segments[navIndex];
-
-      // Voice Alerts for Risk Transfer
+    if (isNavigating && activeRoute?.segments?.[navIndex]) {
+      const seg = activeRoute.segments[navIndex];
       if (seg.risk_level !== prevRisk.current) {
-        if (!demoMuted) {
-          if (seg.risk_level === 'RED') {
-            speak("Warning — entering high risk landslide zone. Consider alternative route.");
-          } else if (seg.risk_level === 'GREEN' && prevRisk.current === 'RED') {
-            speak("Leaving danger zone — route is now safe.");
-          }
+        if (seg.risk_level === 'RED') {
+          speak("Caution: Entering high hazard scarp zone. Factor of safety under 1.05.");
+        } else if (seg.risk_level === 'GREEN' && prevRisk.current === 'RED') {
+          speak("Hazard zone cleared. Entering stabilized valley corridor.");
         }
         prevRisk.current = seg.risk_level;
       }
     }
-  }, [navIndex, isNavigating, routeResult, demoMuted]);
+  }, [navIndex, isNavigating, activeRoute]);
 
+  // ── Calculate Upcoming Maneuvers for Google Maps Driving Card ──────────────
+  const maneuvers = activeRoute?.maneuvers || [];
+  let currentManeuver = maneuvers.find(m => m.index >= navIndex);
+  if (!currentManeuver) currentManeuver = maneuvers[maneuvers.length - 1];
+
+  let distToManeuver = 0;
+  if (activeRoute?.segments && currentManeuver) {
+    const targetIdx = Math.min(currentManeuver.index, activeRoute.segments.length - 1);
+    for (let s = navIndex; s < targetIdx; s++) {
+      const s1 = activeRoute.segments[s];
+      const s2 = activeRoute.segments[s + 1];
+      if (s1 && s2) {
+        distToManeuver += L.latLng(s1.lat, s1.lon ?? s1.lng).distanceTo(L.latLng(s2.lat, s2.lon ?? s2.lng));
+      }
+    }
+  }
+
+  // Dynamic Driving Speedometer computation
+  const currSeg = activeRoute?.segments?.[navIndex] || {};
+  const currentSlope = currSeg.slope_mean || 14.5;
+  const currentFoS = currSeg.fos_seismic || 1.52;
+  const dynamicSpeedKmh = currentSlope > 24 ? 32 : currentSlope > 16 ? 44 : 58;
+
+  // Remaining distance & ETA
+  const totalKm = activeRoute?.distance_km || 40;
+  const progressRatio = activeRoute?.segments?.length ? (navIndex / activeRoute.segments.length) : 0;
+  const remainingKm = Math.max(0, totalKm * (1 - progressRatio));
+  const remainingMin = Math.max(1, Math.round((remainingKm / 42) * 60));
+  const arrivalTime = new Date(Date.now() + remainingMin * 60000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  // Map Click Listener
   const MapEvents = () => {
     useMapEvents({
       click(e) {
-        if (!start) {
+        if (clickTarget === 'origin' || (!start && clickTarget === 'auto')) {
           setStart(e.latlng);
           setStartQuery(`${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`);
-        } else if (!end) {
+          if (clickTarget === 'origin') setClickTarget('destination');
+        } else if (clickTarget === 'destination' || (!end && clickTarget === 'auto')) {
+          setEnd(e.latlng);
+          setEndQuery(`${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`);
+          setClickTarget('auto');
+        } else {
+          // Both set: update destination
           setEnd(e.latlng);
           setEndQuery(`${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`);
         }
@@ -612,385 +557,376 @@ const SafeRoute = () => {
     return null;
   };
 
+  // 2D Camera Follow
   const MapUpdater = () => {
     const map = useMapEvents({});
     useEffect(() => {
       if (isNavigating && carPosition) {
-        map.panTo([carPosition.lat, carPosition.lng], { animate: true, duration: 0.8 });
-      } else if (!isNavigating && routeResult?.route?.segments?.length) {
-        // Fit bounds to route
-        const bounds = routeResult.route.segments
+        map.panTo([carPosition.lat, carPosition.lng], { animate: true, duration: 0.6 });
+      } else if (!isNavigating && activeRoute?.segments?.length) {
+        const bounds = activeRoute.segments
           .filter(s => s && s.lat != null && (s.lon != null || s.lng != null))
           .map(s => [s.lat, s.lon ?? s.lng]);
         if (bounds.length > 0) {
-          try {
-            map.fitBounds(bounds, { padding: [50, 50] });
-          } catch (e) {
-            console.warn("FitBounds failed:", e);
-          }
+          try { map.fitBounds(bounds, { padding: [50, 50] }); } catch (_) {}
         }
       } else if (focusPoint) {
-        map.flyTo([focusPoint.lat, focusPoint.lng], 14, { animate: true, duration: 1 });
+        map.flyTo([focusPoint.lat, focusPoint.lng], 13, { animate: true, duration: 1 });
         setFocusPoint(null);
       }
-    }, [carPosition, isNavigating, routeResult, focusPoint, map]);
+    }, [carPosition, isNavigating, activeRoute, focusPoint, map]);
     return null;
   };
 
+  // Helper for Maneuver Icons
+  const renderManeuverIcon = (type, modifier) => {
+    if (type === 'arrive') return <Flag className="w-6 h-6 text-emerald-400" />;
+    if (type?.includes('right') || modifier?.includes('right')) return <CornerUpRight className="w-6 h-6 text-white" />;
+    if (type?.includes('left') || modifier?.includes('left')) return <CornerUpLeft className="w-6 h-6 text-white" />;
+    if (type?.includes('fork')) return <Split className="w-6 h-6 text-cyan-400" />;
+    return <ArrowUp className="w-6 h-6 text-white" />;
+  };
+
   return (
-    <div className="absolute inset-0 flex flex-col lg:flex-row animate-fade-in overflow-hidden">
-      {/* Sidebar Panel - Hidden during Navigation */}
+    <div className="absolute inset-0 flex flex-col lg:flex-row animate-fade-in overflow-hidden bg-slate-950 font-sans">
+
+      {/* ── SIDEBAR (Hidden during full driving navigation mode for distraction-free view) ── */}
       {!isNavigating && (
-        <div className="w-full lg:w-[380px] h-[45%] lg:h-full bg-slate-950/95 border-r border-slate-800/90 z-20 flex flex-col p-4 sm:p-5 overflow-y-auto shrink-0 transition-all duration-300">
+        <div className="w-full lg:w-[400px] h-[52%] lg:h-full bg-[#070b19]/95 border-r border-slate-800/80 z-20 flex flex-col p-4 overflow-y-auto shrink-0 transition-all duration-300">
+
           {/* Header */}
-          <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-800/80">
+          <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-800/70">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
-                <RouteIcon className="w-4 h-4" />
+              <div className="w-8 h-8 rounded-lg bg-[#2B9EFF]/10 border border-[#2B9EFF]/20 flex items-center justify-center text-[#2B9EFF]">
+                <Navigation className="w-4 h-4" />
               </div>
               <div>
-                <h1 className="text-sm font-semibold text-slate-100 tracking-tight">Safe Route Navigation</h1>
-                <p className="text-[11px] text-slate-400">Hazard-aware pathfinding & live tracking</p>
+                <h1 className="text-sm font-semibold text-slate-100 tracking-tight">Safe Route</h1>
+                <p className="text-[11px] text-slate-400">Hazard-aware mountain routing</p>
               </div>
             </div>
-            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>AI Active</span>
+            <div className="flex items-center gap-1 bg-[#090d1c] border border-slate-800 rounded-lg p-0.5">
+              <button
+                onClick={() => { setMapStyle('dark'); localStorage.setItem('lithos_mapstyle', 'dark'); }}
+                className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition-colors ${mapStyle !== '3d' ? 'bg-[#2B9EFF] text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                2D
+              </button>
+              <button
+                onClick={() => { setMapStyle('3d'); localStorage.setItem('lithos_mapstyle', '3d'); }}
+                className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition-colors ${mapStyle === '3d' ? 'bg-[#2B9EFF] text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                3D
+              </button>
             </div>
           </div>
 
-          {/* Region & View controls */}
-          <div className="grid grid-cols-5 gap-2 mb-3">
-            <div className="col-span-3">
-              <label className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider block mb-1">Region</label>
-              <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-700/80 rounded-lg px-2.5 py-1.5 shadow-sm">
-                <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                <select
-                  className="w-full bg-transparent text-xs font-medium text-slate-200 outline-none cursor-pointer"
-                  value={selectedRegion?.key}
-                  onChange={(e) => {
-                    const reg = regions.find(r => r.key === e.target.value);
-                    if (reg) {
-                      setSelectedRegion(reg);
-                      setStart(null);
-                      setEnd(null);
-                      setRouteResult(null);
-                      setStartQuery('');
-                      setEndQuery('');
-                      setIsNavigating(false);
-                      setCarPosition(null);
-                      setShowCertificate(false);
+          {/* Region Selector */}
+          <div className="mb-3">
+            <div className="flex items-center gap-2 bg-[#090d1c] border border-slate-800 rounded-xl px-3 py-1.5 shadow-sm">
+              <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <select
+                className="w-full bg-transparent text-xs text-slate-200 outline-none cursor-pointer"
+                value={selectedRegion?.key}
+                onChange={(e) => {
+                  const reg = regions.find(r => r.key === e.target.value);
+                  if (reg) {
+                    setSelectedRegion(reg);
+                    setRouteResult(null);
+                    const marks = REGIONAL_LANDMARKS[reg.key];
+                    if (marks && marks.length >= 2) {
+                      setStart({ lat: marks[0].lat, lng: marks[0].lng });
+                      setStartQuery(marks[0].name);
+                      setEnd({ lat: marks[1].lat, lng: marks[1].lng });
+                      setEndQuery(marks[1].name);
                     }
-                  }}
-                >
-                  {regions.map(r => <option key={r.key} value={r.key} className="bg-slate-900 text-slate-100">{r.name}</option>)}
-                </select>
-              </div>
-            </div>
-
-            <div className="col-span-2">
-              <label className="text-[10px] uppercase font-semibold text-slate-400 tracking-wider block mb-1">Map Layer</label>
-              <div className="bg-slate-900 border border-slate-700/80 rounded-lg p-0.5 flex items-center gap-0.5 shadow-sm">
-                {[
-                  { id: 'dark', label: 'Dark', Icon: MapIcon },
-                  { id: 'street', label: 'Sat', Icon: Layers },
-                  { id: '3d', label: '3D', Icon: Globe },
-                ].map(({ id, label, Icon }) => (
-                  <button
-                    key={id}
-                    onClick={() => {
-                      setMapStyle(id);
-                      localStorage.setItem('lithos_mapstyle', id);
-                    }}
-                    className={`flex-1 flex items-center justify-center gap-1 py-1 rounded text-[11px] transition-colors ${
-                      mapStyle === id
-                        ? 'bg-slate-800 text-slate-100 font-semibold border border-slate-600 shadow-sm'
-                        : 'text-slate-400 hover:text-slate-200 border border-transparent font-medium'
-                    }`}
-                    title={label}
-                  >
-                    <Icon className="w-3 h-3" />
-                    <span>{label}</span>
-                  </button>
+                  }
+                }}
+              >
+                {regions.map(r => (
+                  <option key={r.key} value={r.key} className="bg-[#090d1c] text-slate-100">
+                    {r.name} ({r.unit_count || 1200} units)
+                  </option>
                 ))}
-              </div>
+              </select>
             </div>
           </div>
 
-          {/* Waypoints Card */}
-          <div className="bg-slate-900/80 border border-slate-800/90 rounded-xl p-3 mb-3 shadow-sm">
-            <div className="space-y-2">
-              {/* Origin */}
-              <div className="bg-slate-950/70 border border-slate-800 rounded-lg px-2.5 py-1.5 focus-within:border-slate-600 transition-colors flex items-center gap-2">
-                <input
-                  type="text"
-                  value={startQuery}
-                  onChange={e => setStartQuery(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleSearch(startQuery, setStart, setStartQuery)}
-                  placeholder={start ? `${start.lat.toFixed(4)}, ${start.lng.toFixed(4)}` : "Origin (or click map)"}
-                  className="w-full bg-transparent outline-none text-xs text-slate-200 placeholder-slate-500 font-medium"
-                  disabled={loading}
-                />
-                {start && (
-                  <button onClick={() => { setStart(null); setStartQuery(''); }} className="text-slate-500 hover:text-slate-300">
-                    <X className="w-3 h-3" />
+          {/* Google Maps Style Route Input Box (As shown in Google Maps reference) */}
+          <div className="bg-[#090d1c] border border-slate-800 rounded-2xl p-3 shadow-sm mb-3">
+            <div className="flex items-center gap-2.5">
+              {/* Left Column: Origin Dot, Connecting Dotted Line, Destination Pin */}
+              <div className="flex flex-col items-center justify-between py-1.5 shrink-0 self-stretch">
+                <div className="w-2.5 h-2.5 rounded-full bg-[#2B9EFF] ring-2 ring-[#2B9EFF]/30" />
+                <div className="flex flex-col items-center gap-1 my-1">
+                  <span className="w-0.5 h-1 rounded-full bg-slate-600" />
+                  <span className="w-0.5 h-1 rounded-full bg-slate-600" />
+                  <span className="w-0.5 h-1 rounded-full bg-slate-600" />
+                </div>
+                <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+              </div>
+
+              {/* Center Column: Inputs */}
+              <div className="flex-1 flex flex-col gap-2 min-w-0">
+                {/* Origin Input */}
+                <div className="bg-[#050814] border border-white/10 hover:border-white/20 focus-within:border-[#2B9EFF] rounded-xl px-3 py-1.5 flex items-center gap-2 transition-colors">
+                  <input
+                    type="text"
+                    value={startQuery}
+                    onChange={e => setStartQuery(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && searchLocation(startQuery, setStart, setStartQuery)}
+                    placeholder="Your location (e.g. Gangtok, MG Marg)..."
+                    className="w-full bg-transparent outline-none text-xs text-white placeholder-slate-500 font-medium"
+                  />
+                  {start && (
+                    <button onClick={() => { setStart(null); setStartQuery(''); }} className="text-slate-500 hover:text-slate-300">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  <button onClick={() => searchLocation(startQuery, setStart, setStartQuery)} className="text-slate-400 hover:text-[#2B9EFF]">
+                    <Search className="w-3.5 h-3.5" />
                   </button>
-                )}
-                <button 
-                  onClick={() => handleSearch(startQuery, setStart, setStartQuery)} 
-                  disabled={loading} 
-                  className="text-slate-400 hover:text-slate-200 shrink-0"
-                  title="Search origin"
-                >
-                  <Search className="w-3.5 h-3.5" />
-                </button>
-              </div>
+                </div>
 
-              {/* Destination */}
-              <div className="bg-slate-950/70 border border-slate-800 rounded-lg px-2.5 py-1.5 focus-within:border-slate-600 transition-colors flex items-center gap-2">
-                <input
-                  type="text"
-                  value={endQuery}
-                  onChange={e => setEndQuery(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleSearch(endQuery, setEnd, setEndQuery)}
-                  placeholder={end ? `${end.lat.toFixed(4)}, ${end.lng.toFixed(4)}` : "Destination (or click map)"}
-                  className="w-full bg-transparent outline-none text-xs text-slate-200 placeholder-slate-500 font-medium"
-                  disabled={loading}
-                />
-                {end && (
-                  <button onClick={() => { setEnd(null); setEndQuery(''); }} className="text-slate-500 hover:text-slate-300">
-                    <X className="w-3 h-3" />
+                {/* Destination Input */}
+                <div className="bg-[#050814] border border-white/10 hover:border-white/20 focus-within:border-[#2B9EFF] rounded-xl px-3 py-1.5 flex items-center gap-2 transition-colors">
+                  <input
+                    type="text"
+                    value={endQuery}
+                    onChange={e => setEndQuery(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && searchLocation(endQuery, setEnd, setEndQuery)}
+                    placeholder="Choose destination (e.g. Tsomgo, Nathu La)..."
+                    className="w-full bg-transparent outline-none text-xs text-white placeholder-slate-500 font-medium"
+                  />
+                  {end && (
+                    <button onClick={() => { setEnd(null); setEndQuery(''); }} className="text-slate-500 hover:text-slate-300">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  <button onClick={() => searchLocation(endQuery, setEnd, setEndQuery)} className="text-slate-400 hover:text-[#2B9EFF]">
+                    <Search className="w-3.5 h-3.5" />
                   </button>
-                )}
-                <button 
-                  onClick={() => handleSearch(endQuery, setEnd, setEndQuery)} 
-                  disabled={loading} 
-                  className="text-slate-400 hover:text-slate-200 shrink-0"
-                  title="Search destination"
-                >
-                  <Search className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Helper Status & Swap */}
-            <div className="mt-2 pt-2 border-t border-slate-800/70 flex items-center justify-between text-[11px] text-slate-400">
-              <span className="flex items-center gap-1">
-                <MapPin className="w-3 h-3 text-cyan-400" />
-                {!start ? 'Click map to place Origin' : !end ? 'Click map to place Destination' : 'Points ready'}
-              </span>
-              {start && end && (
-                <button 
-                  onClick={() => {
-                    const tempS = start; const tempQ = startQuery;
-                    setStart(end); setStartQuery(endQuery);
-                    setEnd(tempS); setEndQuery(tempQ);
-                  }}
-                  className="text-[10px] text-slate-400 hover:text-slate-200 flex items-center gap-1 font-medium transition-colors"
-                >
-                  <ArrowUpDown className="w-2.5 h-2.5" /> Swap
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Action Button */}
-          <button
-            onClick={calculateRoute}
-            disabled={!start || !end || loading}
-            className={`w-full py-2.5 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-2 mb-3.5 ${
-              !start || !end 
-                ? 'bg-slate-800/80 text-slate-500 border border-slate-700/50 cursor-not-allowed' 
-                : 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-sm border border-cyan-400/30 active:scale-[0.99]'
-            }`}
-          >
-            {loading ? (
-              <>
-                <Loader2 className="animate-spin w-3.5 h-3.5 text-white" />
-                <span>Computing Safe Corridor...</span>
-              </>
-            ) : (
-              <>
-                <Navigation className="w-3.5 h-3.5" />
-                <span>Calculate Safe Route</span>
-              </>
-            )}
-          </button>
-
-          {/* Rainfall / Environmental Telemetry */}
-          {selectedRegion && <RainfallClock region={selectedRegion.key} />}
-
-          {/* Route Results */}
-          {routeResult && (
-            <div className="space-y-3 pt-3 border-t border-slate-800/80 animate-fade-in">
-              <div className="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800">
-                <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <h3 className="text-base font-semibold text-slate-100">{routeResult.route.distance_km} <span className="text-xs font-normal text-slate-400">km</span></h3>
-                    <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wide">Calculated Distance</p>
-                  </div>
-                  <RiskBadge level={routeResult.route.max_risk_level} score={routeResult.route.safe_score} />
-                </div>
-
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-[11px] font-medium">
-                    <span className="text-slate-400">Safe corridor ratio</span>
-                    <span className="text-emerald-400 font-semibold font-mono">
-                      {Math.round((routeResult.route.risk_summary.GREEN / (routeResult.route.risk_summary.RED + routeResult.route.risk_summary.ORANGE + routeResult.route.risk_summary.GREEN)) * 100)}%
-                    </span>
-                  </div>
-                  <div className="h-1.5 flex rounded-full overflow-hidden bg-slate-800">
-                    <div className="h-full bg-emerald-500" style={{ width: `${(routeResult.route.risk_summary.GREEN / (routeResult.route.risk_summary.RED + routeResult.route.risk_summary.ORANGE + routeResult.route.risk_summary.GREEN)) * 100}%` }} />
-                    <div className="h-full bg-amber-500" style={{ width: `${(routeResult.route.risk_summary.ORANGE / (routeResult.route.risk_summary.RED + routeResult.route.risk_summary.ORANGE + routeResult.route.risk_summary.GREEN)) * 100}%` }} />
-                    <div className="h-full bg-rose-500" style={{ width: `${(routeResult.route.risk_summary.RED / (routeResult.route.risk_summary.RED + routeResult.route.risk_summary.ORANGE + routeResult.route.risk_summary.GREEN)) * 100}%` }} />
-                  </div>
                 </div>
               </div>
 
-              {routeResult.warnings.length > 0 && (
-                <div className="bg-rose-500/10 border border-rose-500/30 p-2.5 rounded-lg space-y-1.5">
-                  {routeResult.warnings.map((w, i) => (
-                    <p key={i} className="text-[11px] text-rose-400 flex items-start gap-1.5">
-                      <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" /> {w}
-                    </p>
-                  ))}
-                </div>
-              )}
-
-              {routeResult.runout_warnings && routeResult.runout_warnings.length > 0 && (
-                <div className="bg-rose-500/15 border border-rose-500/40 p-3 rounded-lg">
-                  <p className="text-[11px] font-semibold text-rose-400 uppercase tracking-wide mb-1.5 flex items-center gap-1.5">
-                    <AlertTriangle className="w-3.5 h-3.5" /> Active Runout Zones Detected
-                  </p>
-                  <div className="space-y-1">
-                    {routeResult.runout_warnings.map((rw, i) => (
-                      <div key={i} className="flex justify-between items-center text-[11px] text-slate-200 bg-slate-900/60 px-2 py-1 rounded">
-                        <span>{rw.km_marker}: {rw.cell_id}</span>
-                        <span className="text-rose-400 uppercase text-[9px] bg-rose-500/10 px-1.5 py-0.5 rounded font-medium">Hazard</span>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="text-[10px] text-rose-300/80 mt-1.5">
-                    Road segments may experience active debris runoff at these markers.
-                  </p>
-                </div>
-              )}
-
-              <div className="space-y-1.5">
-                <h3 className="text-[10px] font-semibold uppercase text-slate-400 tracking-wider">Alternative Routes</h3>
-                {routeResult.alternative_routes.map((alt, i) => (
-                  <div key={i} className="bg-slate-900/60 border border-slate-800 p-2.5 rounded-lg hover:border-slate-700 cursor-pointer transition-all">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="text-xs font-semibold text-slate-200">{alt.distance_km} km</p>
-                        <p className="text-[10px] text-slate-400">+{alt.extra_time_min} min detour</p>
-                      </div>
-                      <RiskBadge level={alt.max_risk_level} className="scale-75 origin-right" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="pt-1 space-y-2">
+              {/* Right Column: Swap & Map Pick Buttons */}
+              <div className="flex flex-col items-center justify-between py-1 shrink-0 self-stretch">
                 <button
-                  onClick={() => startDemoSimulation(demoSpeed)}
-                  className="w-full py-2.5 rounded-lg font-semibold text-xs transition-all flex items-center justify-center gap-2 bg-gradient-to-r from-cyan-600 to-sky-600 hover:from-cyan-500 hover:to-sky-500 text-white shadow-sm active:scale-[0.99]"
+                  onClick={() => {
+                    const tmpS = start; const tmpSQ = startQuery;
+                    setStart(end); setStartQuery(endQuery);
+                    setEnd(tmpS); setEndQuery(tmpSQ);
+                  }}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+                  title="Reverse starting point and destination"
                 >
-                  <Play className="w-3.5 h-3.5 fill-white" /> Start Demo Simulation ({demoSpeed}x Speed)
+                  <ArrowUpDown className="w-4 h-4" />
                 </button>
+                <button
+                  onClick={() => setClickTarget(clickTarget === 'destination' ? 'auto' : 'destination')}
+                  className={`p-1.5 rounded-lg transition-colors ${clickTarget === 'destination' ? 'bg-[#2B9EFF] text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+                  title="Click map to pick destination"
+                >
+                  <MapPin className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Clean Get Routes Button (Lithos Electric Blue) */}
+            <button
+              onClick={calculateRoute}
+              disabled={!start || !end || loading}
+              className={`w-full py-2.5 rounded-xl font-semibold text-xs transition-all flex items-center justify-center gap-2 mt-3 ${
+                !start || !end || loading
+                  ? 'bg-slate-800/80 text-slate-500 cursor-not-allowed'
+                  : 'bg-[#2B9EFF] hover:bg-[#1a6bc4] text-white shadow-sm active:scale-[0.99] cursor-pointer'
+              }`}
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="animate-spin w-4 h-4 text-white" />
+                  <span>Calculating terrain route...</span>
+                </>
+              ) : (
+                <>
+                  <Navigation className="w-3.5 h-3.5 fill-white text-white" />
+                  <span>Get Routes</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Environmental Rainfall Radar (Compact / Clean) */}
+          {selectedRegion && !routeResult && (
+            <RainfallClock region={selectedRegion.key} />
+          )}
+
+          {/* ── 3-ROUTE COMPARISON SELECTOR CARDS (Google Maps Style in LITHOS Theme) ── */}
+          {routeResult?.routes && (
+            <div className="space-y-2 mt-1 pt-1 animate-fade-in">
+              <div className="flex items-center justify-between px-1 mb-1">
+                <span className="text-[11px] font-semibold text-slate-400">
+                  Recommended Routes
+                </span>
+                <span className="text-[10px] text-slate-500">Safest corridor first</span>
+              </div>
+
+              <div className="space-y-2">
+                {routeResult.routes.map((r, idx) => {
+                  const isSelected = selectedRouteIdx === idx;
+                  const isSafe = r.category === 'SAFE';
+                  const isMod = r.category === 'MODERATE';
+                  const isDanger = r.category === 'DANGER';
+
+                  const badgeBg = isSafe
+                    ? 'bg-[#2DC77A]/15 text-[#2DC77A]'
+                    : isMod
+                    ? 'bg-[#F4A261]/15 text-[#F4A261]'
+                    : 'bg-[#E63946]/15 text-[#E63946]';
+
+                  return (
+                    <div
+                      key={r.id || idx}
+                      onClick={() => setSelectedRouteIdx(idx)}
+                      className={`p-3 rounded-xl border transition-all cursor-pointer relative ${
+                        isSelected
+                          ? 'border-[#2B9EFF] bg-[#2B9EFF]/5 shadow-sm'
+                          : 'border-white/10 bg-[#090d1c] hover:bg-slate-900/60 hover:border-white/20'
+                      }`}
+                    >
+                      {isSelected && (
+                        <div
+                          className="absolute top-0 left-0 bottom-0 w-1 rounded-l-xl"
+                          style={{ background: r.color || '#2B9EFF' }}
+                        />
+                      )}
+
+                      <div className="flex items-start justify-between gap-3 pl-1">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <span className="text-sm font-bold text-white tracking-tight">
+                              {r.title}
+                            </span>
+                            <span className={`text-[9px] font-bold px-2 py-0.5 rounded ${badgeBg}`}>
+                              {r.badge}
+                            </span>
+                          </div>
+
+                          <p className="text-[11px] text-slate-400 mt-0.5 line-clamp-1">
+                            {r.corridor_name ? `${r.corridor_name} · ` : ''}{r.desc}
+                          </p>
+
+                          {/* Clean inline geotechnical metrics */}
+                          <div className="flex items-center gap-2.5 mt-2 text-[10px] text-slate-400">
+                            <span className="flex items-center gap-1">
+                              <span className="text-slate-500">FoS</span>
+                              <span className={`font-mono font-bold ${r.min_fos < 1.05 ? 'text-[#E63946]' : r.min_fos < 1.30 ? 'text-[#F4A261]' : 'text-[#2DC77A]'}`}>
+                                {r.min_fos?.toFixed(2) || '1.45'}
+                              </span>
+                            </span>
+                            <span className="text-slate-600">·</span>
+                            <span className="flex items-center gap-1">
+                              <span className="text-slate-500">Slope</span>
+                              <span className="font-mono text-slate-300">{r.max_slope_deg?.toFixed(0) || '18'}°</span>
+                            </span>
+                            <span className="text-slate-600">·</span>
+                            <span className="flex items-center gap-1">
+                              <span className="text-slate-500">Safe Corridor</span>
+                              <span className="font-mono text-[#2DC77A]">{r.safe_corridor_pct || Math.round(r.safe_score * 100)}%</span>
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Travel Time & Distance (Google Maps style) */}
+                        <div className="text-right shrink-0">
+                          <div className={`text-base font-bold ${isSelected ? 'text-[#2B9EFF]' : 'text-white'}`}>
+                            {formatDuration(r.estimated_time_min)}
+                          </div>
+                          <div className="text-[11px] text-slate-400 font-medium">
+                            {r.distance_km} km
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Clean Google Maps Style Start Navigation Button */}
+              <div className="pt-2">
                 <button
                   onClick={() => {
                     setIsNavigating(true);
-                    setIsDemoMode(false);
+                    setIsDrivingMode(true);
+                    setIsDemoPlaying(true);
                     setNavIndex(0);
-                    setCarPosition({ lat: start.lat, lng: start.lng });
-                    try {
-                      localStorage.setItem('active_route', JSON.stringify(routeResult.route.segments));
-                      localStorage.setItem('cached_risk_grid', JSON.stringify(riskGrid));
-                      localStorage.setItem('cache_timestamp', new Date().toISOString());
-                    } catch (e) {
-                      console.warn('LocalStorage quota exceeded during navigation start');
+                    const seg0 = activeRoute?.segments?.[0];
+                    if (seg0) {
+                      setCarPosition({
+                        lat: seg0.lat,
+                        lng: seg0.lon ?? seg0.lng,
+                        risk: seg0.risk_level || 'GREEN',
+                        slope: seg0.slope_mean ?? 14,
+                        fos: seg0.fos_seismic ?? 1.5,
+                        heading: 0
+                      });
                     }
+                    speak(`Starting navigation along ${activeRoute.title}`);
+                    requestWakeLock();
                   }}
-                  className="w-full py-2 rounded-lg font-medium text-xs transition-all flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700/80 shadow-sm"
+                  className="w-full py-2.5 rounded-full font-bold text-xs tracking-wider transition-all flex items-center justify-center gap-2 bg-[#2B9EFF] hover:bg-[#2087de] text-white shadow-md active:scale-[0.99] cursor-pointer uppercase"
                 >
-                  <Navigation className="w-3.5 h-3.5 text-emerald-400" /> Start Live GPS Navigation
+                  <Navigation className="w-3.5 h-3.5 fill-white text-white" />
+                  <span>Start Navigation ({mapStyle === '3d' ? '3D' : '2D'})</span>
                 </button>
               </div>
             </div>
           )}
 
+          {/* Reset waypoints */}
           <div className="mt-auto pt-4">
             <button
-              onClick={() => { setStart(null); setEnd(null); setRouteResult(null); setStartQuery(''); setEndQuery(''); setIsNavigating(false); setCarPosition(null); }}
-              className="text-[11px] text-slate-400 hover:text-slate-200 transition-colors block text-center mx-auto"
+              onClick={() => {
+                setStart(null); setEnd(null); setRouteResult(null);
+                setStartQuery(''); setEndQuery(''); setIsNavigating(false);
+                setCarPosition(null);
+              }}
+              className="text-[11px] text-slate-500 hover:text-slate-300 transition-colors block text-center mx-auto cursor-pointer"
             >
-              Reset waypoints
+              Reset all waypoints
             </button>
           </div>
         </div>
       )}
 
-      {/* Map View */}
+      {/* ── MAP CONTAINER (2D Leaflet or 3D Cesium) ── */}
       <div className="flex-grow h-full relative w-full transition-all duration-500">
-        {/* Floating Map Style Switcher (visible in both 2D and 3D) */}
+
+        {/* Top-Right Map Style Switcher (visible in all states) */}
         <div className="absolute top-4 right-4 z-30 pointer-events-auto">
-          <div className="glass p-1.5 rounded-full flex gap-1 border border-white/10 shadow-lg backdrop-blur-md bg-slate-950/80">
+          <div className="glass p-1.5 rounded-full flex gap-1 border border-white/10 shadow-2xl backdrop-blur-md bg-slate-950/80">
             <button
-              onClick={() => { const s = 'dark'; setMapStyle(s); localStorage.setItem('lithos_mapstyle', s); }}
-              className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer ${mapStyle === 'dark' ? 'bg-white/20 text-white shadow-sm' : 'text-white/50 hover:text-white/90'}`}
+              onClick={() => { setMapStyle('dark'); localStorage.setItem('lithos_mapstyle', 'dark'); }}
+              className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer ${mapStyle === 'dark' ? 'bg-cyan-500 text-slate-950 shadow-sm' : 'text-white/60 hover:text-white'}`}
             >
-              <MapIcon className="w-3.5 h-3.5" /> Dark
+              <MapIcon className="w-3.5 h-3.5" /> 2D Map
             </button>
             <button
-              onClick={() => { const s = 'street'; setMapStyle(s); localStorage.setItem('lithos_mapstyle', s); }}
-              className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer ${mapStyle === 'street' ? 'bg-white/20 text-white shadow-sm' : 'text-white/50 hover:text-white/90'}`}
+              onClick={() => { setMapStyle('3d'); localStorage.setItem('lithos_mapstyle', '3d'); }}
+              className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer ${mapStyle === '3d' ? 'bg-cyan-500 text-slate-950 shadow-sm' : 'text-white/60 hover:text-white'}`}
             >
-              <Layers className="w-3.5 h-3.5" /> Sat
-            </button>
-            <button
-              onClick={() => { const s = '3d'; setMapStyle(s); localStorage.setItem('lithos_mapstyle', s); }}
-              className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer ${mapStyle === '3d' ? 'bg-cyan-500/30 text-cyan-300 border border-cyan-400/50 shadow-sm' : 'text-white/50 hover:text-white/90'}`}
-            >
-              <Globe className="w-3.5 h-3.5" /> 3D
+              <Globe className="w-3.5 h-3.5" /> 3D Globe
             </button>
           </div>
         </div>
 
-        {/* Floating Quick Locate Me Button */}
-        <div className="absolute top-16 right-4 z-30 pointer-events-auto">
-          <button
-            onClick={() => {
-              if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                  (pos) => {
-                    const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                    setStart(loc);
-                    setStartQuery('Current GPS Location');
-                    if (isNavigating) setCarPosition(loc);
-                    setFocusPoint(loc);
-                    speak("Location verified.");
-                  },
-                  (err) => console.error("Locate error", err),
-                  { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-                );
-              }
-            }}
-            className="glass p-2.5 rounded-full flex items-center justify-center gap-1 border border-[#00C2FF]/30 shadow-lg backdrop-blur-md text-[#00C2FF] hover:bg-[#00C2FF]/10 transition-all bg-slate-950/80 cursor-pointer"
-            title="Locate Current Position"
-          >
-            <Navigation className="w-4 h-4" />
-          </button>
-        </div>
-
+        {/* ── Render 3D Cesium or 2D Leaflet ── */}
         <div className="absolute inset-0">
           {mapStyle === '3d' ? (
-            /* ── 3D CesiumJS Terrain View ── */
             <Suspense fallback={
               <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100%', background:'#050d1e', color:'#00C2FF', flexDirection:'column', gap:12 }}>
                 <div style={{ width:36, height:36, borderRadius:'50%', border:'2px solid rgba(0,194,255,0.2)', borderTopColor:'#00C2FF', animation:'spin 1s linear infinite' }} />
-                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-                <p style={{ fontSize:11, fontWeight:700, letterSpacing:'0.15em', textTransform:'uppercase' }}>Loading 3D Terrain…</p>
+                <p style={{ fontSize:11, fontWeight:700, letterSpacing:'0.15em', textTransform:'uppercase' }}>Streaming 3D Mountain Terrain…</p>
               </div>
             }>
               <CesiumTerrain3DLazy
@@ -998,6 +934,8 @@ const SafeRoute = () => {
                 riskGrid={riskGrid}
                 activeRunouts={activeRunouts}
                 routeResult={routeResult}
+                selectedRouteIdx={selectedRouteIdx}
+                onSelectRoute={(idx) => setSelectedRouteIdx(idx)}
                 carPosition={carPosition}
                 start={start}
                 end={end}
@@ -1010,598 +948,338 @@ const SafeRoute = () => {
                 demoPresets={DEMO_PRESETS}
                 demoSpeed={demoSpeed}
                 onSetDemoSpeed={setDemoSpeed}
-                onLoadDemoPreset={loadDemoPreset}
-                onStartDemoSimulation={startDemoSimulation}
-                onStartLiveNavigation={() => {
+                onStartDemoSimulation={() => {
                   setIsNavigating(true);
-                  setIsDemoMode(false);
-                  setNavIndex(0);
-                  if (start) setCarPosition({ lat: start.lat, lng: start.lng });
+                  setIsDrivingMode(true);
+                  setIsDemoPlaying(true);
                 }}
                 onMapClick={(loc) => {
                   if (!start) {
                     setStart(loc);
                     setStartQuery(`${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}`);
-                  } else if (!end) {
-                    setEnd(loc);
-                    setEndQuery(`${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}`);
                   } else {
-                    // Update destination to newly clicked position
                     setEnd(loc);
                     setEndQuery(`${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}`);
-                    setRouteResult(null);
                   }
                 }}
               />
             </Suspense>
           ) : (
-            /* ── 2D Leaflet View ── */
             <MapContainer
-              key={`${selectedRegion?.key || 'saferoute-2d'}-${mapStyle}`}
+              key={`${selectedRegion?.key || 'saferoute'}-${mapStyle}`}
               center={selectedRegion?.center || [27.33, 88.61]}
               zoom={12}
               preferCanvas={true}
               className="w-full h-full"
               zoomControl={false}
             >
-            <TileLayer
-              url={mapStyle === 'dark'
-                ? "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"
-                : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              }
-            />
-            <MapEvents />
-
-            {/* Consolidated 2D Layers & Tools Drawer */}
-            <div className="absolute top-4 left-4 z-[1000]">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShow2DToolsDrawer(!show2DToolsDrawer);
-                }}
-                className={`px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-2 shadow-md backdrop-blur-md transition-all cursor-pointer ${
-                  show2DToolsDrawer
-                    ? 'bg-slate-800 text-white border-slate-600'
-                    : 'bg-slate-900/90 text-slate-200 border-slate-700/80 hover:bg-slate-800 hover:text-white'
-                }`}
-                title="Map Layers, Overlays and Tools"
-              >
-                <SlidersHorizontal className="w-3.5 h-3.5 text-sky-400" />
-                <span>Layers & Tools</span>
-              </button>
-
-              {show2DToolsDrawer && (
-                <div
-                  onClick={(e) => e.stopPropagation()}
-                  className="mt-2 w-72 bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl p-3.5 space-y-3 text-slate-200 animate-in fade-in slide-in-from-top-2 duration-150"
-                >
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                    <div className="flex items-center gap-2">
-                      <Layers className="w-4 h-4 text-sky-400" />
-                      <span className="text-xs font-semibold text-white">Map Layers & Tools</span>
-                    </div>
-                    <button 
-                      onClick={() => setShow2DToolsDrawer(false)}
-                      className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 cursor-pointer"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-
-                  {/* Demo Corridors Section */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <Sparkles className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
-                        <span className="text-[10px] font-semibold uppercase tracking-wider text-cyan-300">
-                          Demo Corridors
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1 bg-slate-950/80 border border-slate-700/80 rounded-md p-0.5">
-                        <button
-                          onClick={() => setDemoSpeed(4)}
-                          className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${demoSpeed === 4 ? 'bg-cyan-500 text-slate-950 font-black' : 'text-slate-400 hover:text-slate-200'}`}
-                          title="4x Real-Time Travel Speed"
-                        >
-                          4x
-                        </button>
-                        <button
-                          onClick={() => setDemoSpeed(10)}
-                          className={`px-1.5 py-0.5 text-[9px] font-bold rounded ${demoSpeed === 10 ? 'bg-amber-400 text-slate-950 font-black' : 'text-slate-400 hover:text-slate-200'}`}
-                          title="10x Fast-Forward Presentation Speed"
-                        >
-                          10x
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      {DEMO_PRESETS.map((preset) => (
-                        <button
-                          key={preset.id}
-                          onClick={() => {
-                            loadDemoPreset(preset);
-                            setShow2DToolsDrawer(false);
-                          }}
-                          className="w-full flex items-center justify-between text-left px-2 py-1.5 rounded-lg bg-slate-950/60 hover:bg-cyan-950/40 border border-slate-800 hover:border-cyan-500/40 transition-all group cursor-pointer"
-                        >
-                          <div className="min-w-0 pr-1.5">
-                            <div className="flex items-center gap-1">
-                              <span className="text-[10px] font-medium text-slate-200 group-hover:text-cyan-300 truncate">
-                                {preset.name}
-                              </span>
-                            </div>
-                            <span className="text-[8px] text-slate-400 block truncate">{preset.desc}</span>
-                          </div>
-                          <ChevronRight className="w-3 h-3 text-slate-500 group-hover:text-cyan-400 shrink-0" />
-                        </button>
-                      ))}
-                    </div>
-
-                    {routeResult && (
-                      <button
-                        onClick={() => {
-                          startDemoSimulation(demoSpeed);
-                          setShow2DToolsDrawer(false);
-                        }}
-                        className="w-full py-1.5 rounded-lg bg-gradient-to-r from-cyan-600 to-sky-600 hover:from-cyan-500 hover:to-sky-500 text-white text-[10px] font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.99] transition-all cursor-pointer"
-                      >
-                        <Play className="w-3 h-3 fill-white" />
-                        <span>Start Demo Run ({demoSpeed}x Speed)</span>
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Map Layer Style */}
-                  <div className="pt-2 border-t border-slate-800 space-y-1.5">
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 block">Map View Mode</span>
-                    <div className="grid grid-cols-3 gap-1">
-                      {[
-                        { id: 'dark', label: 'Dark' },
-                        { id: 'street', label: 'Street' },
-                        { id: '3d', label: '3D Globe' },
-                      ].map(m => (
-                        <button
-                          key={m.id}
-                          onClick={() => { setMapStyle(m.id); localStorage.setItem('lithos_mapstyle', m.id); }}
-                          className={`py-1 text-[10px] font-bold rounded border text-center transition-all ${mapStyle === m.id ? 'bg-cyan-600 text-white border-cyan-400' : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:text-slate-200'}`}
-                        >
-                          {m.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-
-
-            {/* Risk Heatmap Overlay — smooth colour gradient over the slope grid */}
-            {riskGrid && (
-              <HeatmapLayer
-                key={`heatmap-${selectedRegion?.key}-${riskGrid.features?.length}`}
-                riskGrid={riskGrid}
-                opacity={0.75}
+              <TileLayer
+                url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"
               />
-            )}
+              <MapEvents />
 
-            {/* ── Active Debris Runout Fans Overlay in 2D ── */}
-            {activeRunouts && activeRunouts.map((fan) => {
-              const coords = fan?.fan_polygon?.coordinates?.[0];
-              if (!coords || !Array.isArray(coords) || coords.length < 3) return null;
-              return (
-                <React.Fragment key={`saferoute-fan-${fan.cell_id}`}>
+              {/* Heatmap Overlay */}
+              {riskGrid && <HeatmapLayer riskGrid={riskGrid} opacity={0.75} />}
+
+              {/* Active Debris Runout Zones */}
+              {activeRunouts?.map((fan) => {
+                const coords = fan?.fan_polygon?.coordinates?.[0];
+                if (!coords || coords.length < 3) return null;
+                return (
                   <Polygon
+                    key={`fan-${fan.cell_id}`}
                     positions={coords.map(c => [c[1], c[0]])}
                     pathOptions={{
                       fillColor: '#FF3B30',
                       fillOpacity: 0.35,
                       color: '#FF3B30',
                       weight: 2,
-                      dashArray: '5, 3',
-                      interactive: true
+                      dashArray: '5, 3'
                     }}
                   >
                     <Popup className="glass-popup">
-                      <div className="p-2 text-white min-w-[200px]">
-                        <div className="flex items-center gap-1.5 text-xs font-black text-red-400 mb-1">
-                          <AlertTriangle className="w-3.5 h-3.5" /> DEBRIS RUNOUT IMPACT ZONE
-                        </div>
-                        <div className="text-[11px] text-white/80 space-y-0.5">
-                          <p><strong>Slope Unit:</strong> {fan.cell_id}</p>
-                          <p><strong>FoS (Seismic):</strong> <span className="text-red-400 font-bold">{fan.fos_seismic ? Number(fan.fos_seismic).toFixed(2) : '< 1.0'}</span></p>
-                          <p><strong>Runout Reach:</strong> {fan.runout_m ? `${Math.round(fan.runout_m)} m` : 'N/A'}</p>
-                          {fan.debris_volume_m3 && <p><strong>Debris Volume:</strong> {Math.round(fan.debris_volume_m3).toLocaleString()} m³</p>}
-                        </div>
-                        <p className="text-[10px] text-red-300/80 mt-1.5 font-semibold leading-tight">
-                          ⚠ High hazard: A* routing actively penalizes and steers away from this slope.
-                        </p>
+                      <div className="p-2 text-white">
+                        <p className="text-xs font-bold text-red-400">⚠ DEBRIS RUNOUT IMPACT ZONE</p>
+                        <p className="text-[11px] text-white/80">FoS Seismic: {fan.fos_seismic ? Number(fan.fos_seismic).toFixed(2) : '<1.0'}</p>
+                        <p className="text-[10px] text-white/60">A* router steers away from this slope</p>
                       </div>
                     </Popup>
                   </Polygon>
-                  {fan.center_lat && fan.center_lon && (
-                    <Marker
-                      position={[fan.center_lat, fan.center_lon]}
-                      icon={L.divIcon({
-                        className: '',
-                        iconSize: [16, 16],
-                        iconAnchor: [8, 8],
-                        html: `
-                          <div style="width:16px;height:16px;border-radius:50%;background:#FF3B30;border:2px solid white;display:flex;align-items:center;justify-content:center;box-shadow:0 0 8px rgba(255,59,48,0.8);">
-                            <div style="width:4px;height:4px;border-radius:50%;background:white;"></div>
-                          </div>
-                        `
-                      })}
-                    >
-                      <Popup className="glass-popup">
-                        <div className="p-1 text-xs text-red-400 font-bold">
-                          Rupture Apex: {fan.cell_id}
-                        </div>
-                      </Popup>
-                    </Marker>
-                  )}
-                </React.Fragment>
-              );
-            })}
+                );
+              })}
 
-            {!isNavigating && start && (
-              <Marker
-                position={start}
-                draggable={!isNavigating}
-                eventHandlers={{
-                  dragend: (e) => {
-                    const latlng = e.target.getLatLng();
-                    setStart(latlng);
-                    setStartQuery(`${latlng.lat.toFixed(4)}, ${latlng.lng.toFixed(4)}`);
-                    setRouteResult(null); // Clear route on drag
-                  }
-                }}
-                icon={L.divIcon({ className: 'bg-[#FFD60A] w-4 h-4 rounded-full border-[3px] border-white shadow-lg shadow-black/50 hover:scale-110 transition-transform cursor-grab pointer-events-auto' })}
-              />
-            )}
-
-            {!isNavigating && end && (
-              <Marker
-                position={end}
-                draggable={!isNavigating}
-                eventHandlers={{
-                  dragend: (e) => {
-                    const latlng = e.target.getLatLng();
-                    setEnd(latlng);
-                    setEndQuery(`${latlng.lat.toFixed(4)}, ${latlng.lng.toFixed(4)}`);
-                    setRouteResult(null); // Clear route on drag
-                  }
-                }}
-                icon={L.divIcon({ className: 'bg-risk-red w-4 h-4 rounded-full border-[3px] border-white shadow-lg shadow-black/50 hover:scale-110 transition-transform cursor-grab pointer-events-auto' })}
-              />
-            )}
-
-            {carPosition && isNavigating && (() => {
-              const ringColor = carPosition.risk === 'RED' ? '#FF3B30' : carPosition.risk === 'ORANGE' ? '#FF9500' : '#00C2FF';
-              const ringColorRgb = carPosition.risk === 'RED' ? '255,59,48' : carPosition.risk === 'ORANGE' ? '255,149,0' : '0,194,255';
-              return (
+              {/* Start & End Markers */}
+              {!isNavigating && start && (
                 <Marker
-                  position={[carPosition.lat, carPosition.lng]}
+                  position={start}
+                  draggable={true}
+                  eventHandlers={{
+                    dragend: (e) => {
+                      const ll = e.target.getLatLng();
+                      setStart(ll);
+                      setStartQuery(`${ll.lat.toFixed(4)}, ${ll.lng.toFixed(4)}`);
+                    }
+                  }}
                   icon={L.divIcon({
                     className: '',
-                    iconSize: [0, 0],
-                    iconAnchor: [0, 0],
-                    html: `
-                      <div style="position:relative;width:0;height:0">
-                        <!-- Scan rings -->
-                        <div class="nav-scan-ring-1" style="position:absolute;top:0;left:0;width:40px;height:40px;border-radius:50%;border:2px solid ${ringColor};opacity:0;pointer-events:none;"></div>
-                        <div class="nav-scan-ring-2" style="position:absolute;top:0;left:0;width:40px;height:40px;border-radius:50%;border:1.5px solid ${ringColor};opacity:0;pointer-events:none;"></div>
-                        <div class="nav-scan-ring-3" style="position:absolute;top:0;left:0;width:40px;height:40px;border-radius:50%;border:1px solid ${ringColor};opacity:0;pointer-events:none;"></div>
-
-                        <!-- Sonar sweep: conic gradient rotating div -->
-                        <div class="nav-sonar-sweep" style="position:absolute;top:0;left:0;width:80px;height:80px;border-radius:50%;background:conic-gradient(rgba(${ringColorRgb},0.25) 0deg, transparent 60deg);pointer-events:none;overflow:hidden;"></div>
-
-                        <!-- Outer glowing ring -->
-                        <div style="position:absolute;top:0;left:0;width:32px;height:32px;border-radius:50%;background:rgba(${ringColorRgb},0.12);border:1.5px solid rgba(${ringColorRgb},0.5);transform:translate(-50%,-50%);"></div>
-
-                        <!-- Center car dot -->
-                        <div style="position:absolute;top:0;left:0;width:16px;height:16px;transform:translate(-50%,-50%);background:white;border-radius:50%;border:2.5px solid ${ringColor};display:flex;align-items:center;justify-content:center;box-shadow:0 0 12px rgba(${ringColorRgb},0.9),0 0 4px rgba(${ringColorRgb},0.5);">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="${ringColor}" stroke="${ringColor}" stroke-width="2">
-                            <polygon points="3 11 22 2 13 21 11 13 3 11"/>
-                          </svg>
-                        </div>
-                      </div>
-                    `
+                    html: `<div style="width:18px;height:18px;border-radius:50%;background:#00F0FF;border:3px solid white;box-shadow:0 0 10px #00F0FF;"></div>`
                   })}
                 />
-              );
-            })()}
-
-            {/* Alternative routes */}
-            {routeResult?.alternative_routes && routeResult.alternative_routes.map((alt, idx) => {
-              if (!alt?.segments?.length) return null;
-              return (
-                <Polyline
-                  key={`alt-route-${idx}`}
-                  positions={alt.segments.filter(s => s && s.lat != null && (s.lon != null || s.lng != null)).map(s => [s.lat, s.lon ?? s.lng])}
-                  pathOptions={{
-                    color: '#94A3B8',
-                    weight: 3.5,
-                    opacity: 0.6,
-                    dashArray: '8, 6'
+              )}
+              {!isNavigating && end && (
+                <Marker
+                  position={end}
+                  draggable={true}
+                  eventHandlers={{
+                    dragend: (e) => {
+                      const ll = e.target.getLatLng();
+                      setEnd(ll);
+                      setEndQuery(`${ll.lat.toFixed(4)}, ${ll.lng.toFixed(4)}`);
+                    }
                   }}
+                  icon={L.divIcon({
+                    className: '',
+                    html: `<div style="width:18px;height:18px;border-radius:50%;background:#FF3B30;border:3px solid white;box-shadow:0 0 10px #FF3B30;"></div>`
+                  })}
                 />
-              );
-            })}
+              )}
 
-            {/* Primary Safe Route */}
-            {routeResult?.route?.segments && (
-              <Polyline
-                positions={routeResult.route.segments.filter(s => s && s.lat != null && (s.lon != null || s.lng != null)).map(s => [s.lat, s.lon ?? s.lng])}
-                pathOptions={{
-                  color: routeResult.route.max_risk_level === 'RED' ? '#FF3B30' : '#00C2FF',
-                  weight: 5,
-                  opacity: 0.9,
-                  dashArray: routeResult.route.max_risk_level === 'RED' ? '10, 10' : ''
-                }}
-              />
-            )}
+              {/* ── All 3 Route Polylines Rendered in 2D ── */}
+              {routeResult?.routes ? (
+                routeResult.routes.map((r, rIdx) => {
+                  const isSelected = selectedRouteIdx === rIdx;
+                  if (!r?.segments?.length) return null;
+                  const pts = r.segments.filter(s => s && s.lat != null && (s.lon != null || s.lng != null)).map(s => [s.lat, s.lon ?? s.lng]);
+                  return (
+                    <Polyline
+                      key={`route-${r.id || rIdx}`}
+                      positions={pts}
+                      eventHandlers={{ click: () => setSelectedRouteIdx(rIdx) }}
+                      pathOptions={{
+                        color: r.color || (r.risk_level === 'RED' ? '#EF4444' : r.risk_level === 'ORANGE' ? '#F59E0B' : '#10B981'),
+                        weight: isSelected ? 6.5 : 4,
+                        opacity: isSelected ? 0.95 : 0.6,
+                        dashArray: isSelected ? '' : '8, 6'
+                      }}
+                    />
+                  );
+                })
+              ) : (
+                routeResult?.route?.segments && (
+                  <Polyline
+                    positions={routeResult.route.segments.filter(s => s && s.lat != null && (s.lon != null || s.lng != null)).map(s => [s.lat, s.lon ?? s.lng])}
+                    pathOptions={{ color: '#00C2FF', weight: 6, opacity: 0.9 }}
+                  />
+                )
+              )}
 
-            <MapUpdater />
-          </MapContainer>
-          )} {/* end 2D/3D conditional */}
+              {/* ── Directional 2D Vehicle Marker with Heading & Headlight Cone ── */}
+              {carPosition && isNavigating && (() => {
+                const heading = carPosition.heading || 0;
+                const ringColor = carPosition.risk === 'RED' ? '#FF3B30' : carPosition.risk === 'ORANGE' ? '#FF9500' : '#00F0FF';
+                return (
+                  <Marker
+                    position={[carPosition.lat, carPosition.lng]}
+                    icon={L.divIcon({
+                      className: '',
+                      iconSize: [44, 44],
+                      iconAnchor: [22, 22],
+                      html: `
+                        <div style="transform: rotate(${heading}deg); transform-origin: center center; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; position: relative;">
+                          <!-- Headlight beam -->
+                          <div style="position: absolute; top: -16px; width: 0; height: 0; border-left: 14px solid transparent; border-right: 14px solid transparent; border-top: 26px solid rgba(0, 240, 255, 0.28); filter: blur(2px); transform: rotate(180deg); pointer-events: none;"></div>
+                          <!-- Outer pulse ring -->
+                          <div style="position: absolute; width: 34px; height: 34px; border-radius: 50%; border: 2px solid ${ringColor}; opacity: 0.8; animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></div>
+                          <!-- Center driving cursor -->
+                          <div style="width: 24px; height: 24px; background: #020617; border-radius: 50%; border: 2.5px solid ${ringColor}; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 14px ${ringColor};">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="${ringColor}" stroke="white" stroke-width="1.5">
+                              <polygon points="12 2 19 21 12 17 5 21 12 2" />
+                            </svg>
+                          </div>
+                        </div>
+                      `
+                    })}
+                  />
+                );
+              })()}
+
+              <MapUpdater />
+            </MapContainer>
+          )}
         </div>
 
-
+        {/* ── GOOGLE MAPS DRIVING NAVIGATION OVERLAY (Simple & Clean in Lithos Colors) ── */}
         {isNavigating && (
-            <div className="absolute inset-0 pointer-events-none z-[1000] flex flex-col justify-between p-6">
+          <div className="absolute inset-0 pointer-events-none z-[1000] flex flex-col justify-between p-4 sm:p-6">
 
-            {/* Top Bar: Weather & Progress */}
-            <div className="flex justify-between items-start gap-4">
+            {/* TOP BAR: Google Maps Style Turn-by-Turn Card */}
+            <div className="w-full max-w-lg mx-auto pointer-events-auto animate-in slide-in-from-top duration-300">
+              <div className="bg-[#0B3B24] border border-emerald-600/40 rounded-2xl p-3.5 shadow-2xl backdrop-blur-xl flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center shrink-0">
+                    {renderManeuverIcon(currentManeuver?.type, currentManeuver?.modifier)}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+                        {distToManeuver >= 1000
+                          ? `${(distToManeuver / 1000).toFixed(1)} km`
+                          : `${Math.round(distToManeuver)} m`}
+                      </span>
+                    </div>
+                    <p className="text-xs sm:text-sm font-medium text-emerald-100 truncate">
+                      {currentManeuver?.instruction || "Continue along mountain highway"}
+                    </p>
+                  </div>
+                </div>
 
-              <div className="flex gap-4 items-start pointer-events-auto">
-                {/* Weather Widget */}
-                {weather && !isOffline && (
-                  <div className="glass p-3 rounded-2xl border-white/10 flex items-center gap-3 backdrop-blur-xl shrink-0">
-                    <div className="text-3xl">{weather.icon}</div>
-                    <div>
-                      <h3 className="text-xs font-black text-white/50 uppercase tracking-widest">{selectedRegion?.name}</h3>
-                      <div className="flex items-center gap-2">
-                        <p className="text-xl font-bold">{weather.temperature}°C</p>
-                        <p className="text-sm font-medium text-white/70">{weather.condition}</p>
-                      </div>
+                {/* Exit Drive Button */}
+                <button
+                  onClick={() => {
+                    setIsNavigating(false);
+                    setIsDrivingMode(false);
+                    releaseWakeLock();
+                  }}
+                  className="p-2 rounded-full bg-black/30 hover:bg-black/50 text-white/80 hover:text-white transition-colors shrink-0 cursor-pointer"
+                  title="Exit Navigation"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Landslide Hazard Subtle Banner if entering Red zone */}
+            {currSeg?.risk_level === 'RED' && (
+              <div className="w-full max-w-md mx-auto pointer-events-auto">
+                <div className="bg-rose-950/90 border border-rose-500/60 rounded-xl p-2.5 shadow-xl backdrop-blur-xl flex items-center gap-2.5">
+                  <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-rose-300">Caution: Steep Scarp Sector</p>
+                    <p className="text-xs text-white">Entering slope failure zone (FoS {currentFoS.toFixed(2)}). Drive with care.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* BOTTOM BAR: Google Maps Driving HUD (Simple & Clean in Lithos Colors) */}
+            <div className="w-full max-w-xl mx-auto pointer-events-auto animate-in slide-in-from-bottom duration-300">
+              <div className="bg-[#090d1c]/95 border border-slate-800 rounded-2xl p-4 shadow-2xl backdrop-blur-xl flex flex-col gap-3">
+
+                {/* Top Row: Google Maps ETA & Car Telemetry */}
+                <div className="flex items-center justify-between gap-3 border-b border-slate-800/80 pb-2.5">
+                  <div>
+                    <div className="text-2xl font-bold text-emerald-400 font-mono">
+                      {formatDuration(remainingMin)}
+                    </div>
+                    <div className="text-xs text-slate-400 font-medium">
+                      {remainingKm.toFixed(1)} km · ETA {arrivalTime}
                     </div>
                   </div>
-                )}
 
-                {/* Off Route Warning & Recalculate */}
-                {isOffRoute && (
-                  <div className="glass p-3 rounded-2xl border border-risk-red bg-risk-red/20 flex flex-col gap-1.5 backdrop-blur-xl shrink-0 animate-pulse shadow-[0_0_20px_rgba(255,59,48,0.4)] max-w-[200px]">
-                    <p className="text-[10px] font-black text-risk-red uppercase tracking-widest flex items-center gap-1.5">
-                      <AlertTriangle className="w-4 h-4 shrink-0" /> Off Route Detected
-                    </p>
-                    {nearbyHazards.length > 0 && (
-                      <p className="text-[9px] font-bold text-white/70">
-                        {nearbyHazards.length} critical slope{nearbyHazards.length > 1 ? 's' : ''} nearby
-                      </p>
-                    )}
+                  <div className="flex items-center gap-3 text-right">
+                    {/* Speedometer */}
+                    <div className="text-right">
+                      <span className="text-[9px] uppercase tracking-wider text-slate-500 font-medium block">Speed</span>
+                      <span className="text-sm font-bold text-white font-mono">{dynamicSpeedKmh} <span className="text-[10px] text-slate-400 font-normal">km/h</span></span>
+                    </div>
+
+                    {/* Slope Grade */}
+                    <div className="text-right">
+                      <span className="text-[9px] uppercase tracking-wider text-slate-500 font-medium block">Grade</span>
+                      <span className="text-sm font-bold text-slate-200 font-mono">{currentSlope.toFixed(0)}°</span>
+                    </div>
+
+                    {/* Stability FoS */}
+                    <div className="text-right">
+                      <span className="text-[9px] uppercase tracking-wider text-slate-500 font-medium block">Stability</span>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                        currentFoS < 1.05
+                          ? 'bg-rose-500/15 text-rose-300'
+                          : currentFoS < 1.30
+                          ? 'bg-amber-500/15 text-amber-300'
+                          : 'bg-emerald-500/15 text-emerald-300'
+                      }`}>
+                        FoS {currentFoS.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Middle Row: Clean Progress Bar */}
+                <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                  <div
+                    className="h-full bg-emerald-500 transition-all duration-300"
+                    style={{ width: `${Math.round(progressRatio * 100)}%` }}
+                  />
+                </div>
+
+                {/* Bottom Row: Controls */}
+                <div className="flex items-center justify-between pt-0.5">
+                  <div className="flex items-center gap-2">
                     <button
-                      onClick={calculateRoute}
-                      disabled={isOffline || loading}
-                      className="px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest bg-risk-red text-white hover:scale-105 transition-all disabled:opacity-50 shadow-lg shadow-risk-red/30"
+                      onClick={() => setIsDemoPlaying(!isDemoPlaying)}
+                      className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-medium text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
-                      {isOffline ? 'Return to Path' : 'Recalculate Path'}
+                      {isDemoPlaying ? <><Pause className="w-3.5 h-3.5" /> Pause</> : <><Play className="w-3.5 h-3.5" /> Resume</>}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setNavIndex(0);
+                        const s0 = activeRoute?.segments?.[0];
+                        if (s0) setCarPosition({ lat: s0.lat, lng: s0.lon ?? s0.lng, risk: s0.risk_level || 'GREEN', slope: s0.slope_mean ?? 14, fos: s0.fos_seismic ?? 1.5, heading: 0 });
+                        setIsDemoPlaying(true);
+                      }}
+                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                      title="Restart"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setDemoMuted(!demoMuted)}
+                      className={`p-1.5 rounded-lg transition-colors cursor-pointer ${demoMuted ? 'text-slate-500 hover:text-slate-300' : 'text-[#2B9EFF] hover:text-[#2B9EFF]'}`}
+                      title={demoMuted ? "Unmute Voice" : "Mute Voice"}
+                    >
+                      {demoMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
                     </button>
                   </div>
-                )}
-              </div>
 
-              {/* If Demo Mode: Show Full Presentation Playback Controller */}
-              {isDemoMode && routeResult && (
-                <div className="pointer-events-auto bg-slate-950/95 border border-cyan-500/40 rounded-2xl p-3 shadow-2xl backdrop-blur-xl flex flex-col gap-2 min-w-[300px] sm:min-w-[360px] max-w-[440px] animate-fade-in">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-                      <span className="text-[10px] font-black uppercase tracking-wider text-cyan-300">
-                        Demo Simulation • {demoSpeed}x Real-Time
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => setDemoMuted(!demoMuted)}
-                        className={`p-1.5 rounded-lg border transition-colors ${demoMuted ? 'bg-slate-900 border-slate-700 text-slate-400 hover:text-slate-200' : 'bg-cyan-500/20 border-cyan-500 text-cyan-300'}`}
-                        title={demoMuted ? "Unmute Voice Safety Announcements" : "Mute Voice"}
-                      >
-                        {demoMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
-                      </button>
-                      <button
-                        onClick={() => {
-                          setIsNavigating(false);
-                          setIsDemoMode(false);
-                          setIsDemoPlaying(false);
-                          clearInterval(demoTimerRef.current);
-                        }}
-                        className="px-2 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500 text-rose-300 hover:text-white border border-rose-500/30 text-[10px] font-bold uppercase transition-all"
-                      >
-                        Exit Demo
-                      </button>
-                    </div>
+                  {/* 2D / 3D Mode Toggle */}
+                  <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg p-0.5">
+                    <button
+                      onClick={() => { setMapStyle('dark'); localStorage.setItem('lithos_mapstyle', 'dark'); }}
+                      className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors ${mapStyle !== '3d' ? 'bg-[#2B9EFF] text-white' : 'text-slate-400 hover:text-white'}`}
+                    >
+                      2D
+                    </button>
+                    <button
+                      onClick={() => { setMapStyle('3d'); localStorage.setItem('lithos_mapstyle', '3d'); }}
+                      className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors ${mapStyle === '3d' ? 'bg-[#2B9EFF] text-white' : 'text-slate-400 hover:text-white'}`}
+                    >
+                      3D
+                    </button>
                   </div>
 
-                  {/* Waypoint Scrubber */}
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-[10px] font-mono text-slate-400">
-                      <span>Waypoint {navIndex + 1} of {routeResult.route.segments.length}</span>
-                      <span className="text-cyan-300 font-bold">
-                        {Math.round(((navIndex + 1) / routeResult.route.segments.length) * 100)}%
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={routeResult.route.segments.length - 1}
-                      value={navIndex}
-                      onChange={(e) => {
-                        const idx = parseInt(e.target.value, 10);
-                        setNavIndex(idx);
-                        const seg = routeResult.route.segments[idx];
-                        if (seg) setCarPosition({ lat: seg.lat, lng: seg.lon ?? seg.lng, risk: seg.risk_level });
-                      }}
-                      className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400"
-                    />
-                  </div>
-
-                  {/* Playback Controls & Speed Toggle */}
-                  <div className="flex items-center justify-between pt-1 border-t border-slate-800/80">
-                    <div className="flex items-center gap-1.5">
+                  {/* Speed Multiplier */}
+                  <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg p-0.5">
+                    {[1, 3, 8].map(s => (
                       <button
-                        onClick={() => setIsDemoPlaying(!isDemoPlaying)}
-                        className="px-3 py-1 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm active:scale-[0.98]"
+                        key={s}
+                        onClick={() => setDemoSpeed(s)}
+                        className={`px-2 py-0.5 text-[10px] font-semibold rounded transition-colors ${demoSpeed === s ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
                       >
-                        {isDemoPlaying ? (
-                          <>
-                            <Pause className="w-3 h-3 fill-slate-950" /> Pause
-                          </>
-                        ) : (
-                          <>
-                            <Play className="w-3 h-3 fill-slate-950" /> Play
-                          </>
-                        )}
+                        {s}x
                       </button>
-                      <button
-                        onClick={() => {
-                          setNavIndex(0);
-                          const seg = routeResult.route.segments[0];
-                          if (seg) setCarPosition({ lat: seg.lat, lng: seg.lon ?? seg.lng, risk: seg.risk_level });
-                          setIsDemoPlaying(true);
-                        }}
-                        className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-700/80 transition-colors"
-                        title="Restart from origin"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-
-                    <div className="flex items-center gap-1 bg-slate-900 border border-slate-700/80 rounded-lg p-0.5">
-                      <button
-                        onClick={() => setDemoSpeed(4)}
-                        className={`px-2 py-0.5 text-[10px] font-bold rounded-md transition-colors ${demoSpeed === 4 ? 'bg-cyan-500 text-slate-950 font-black' : 'text-slate-400 hover:text-slate-200'}`}
-                      >
-                        4x Speed
-                      </button>
-                      <button
-                        onClick={() => setDemoSpeed(10)}
-                        className={`px-2 py-0.5 text-[10px] font-bold rounded-md transition-colors ${demoSpeed === 10 ? 'bg-amber-400 text-slate-950 font-black' : 'text-slate-400 hover:text-slate-200'}`}
-                      >
-                        10x Turbo
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Standard Navigation Exit & Havens if NOT in Demo Mode */}
-              {!isDemoMode && (
-                <div className="flex gap-2 mt-28 pointer-events-auto">
-                  <button
-                    onClick={() => setIsNavigating(false)}
-                    className="glass px-4 py-2 rounded-xl bg-risk-red/20 text-risk-red border-risk-red/30 hover:bg-risk-red hover:text-white text-xs font-black uppercase tracking-wider transition-all"
-                  >
-                    Exit Navigation
-                  </button>
-                  <button
-                    onClick={() => setShowEvacuation(v => !v)}
-                    className={`glass px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
-                      showEvacuation ? 'bg-risk-green/20 text-risk-green border border-risk-green/40' : 'text-white/40 border border-white/10'
-                    }`}
-                  >
-                    Safe Havens
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Live Reporting Popups */}
-            <div className="flex flex-col gap-3 max-w-sm self-end pointer-events-auto">
-              {activeAlert && (
-                <div className="glass bg-black/90 p-4 rounded-2xl shadow-[0_0_20px_rgba(255,59,48,0.2)] animate-fade-in flex items-start gap-3 border border-risk-red/40 backdrop-blur-xl">
-                  <AlertTriangle className="w-6 h-6 shrink-0 text-risk-red mt-0.5 animate-pulse" />
-                  <div>
-                    <p className="text-[10px] uppercase font-black tracking-widest text-risk-orange mb-1">LITHOS SAFETY ADVISORY</p>
-                    <p className="text-sm font-bold text-risk-red leading-tight">{activeAlert.message}</p>
-                  </div>
-                </div>
-              )}
-
-              {latestReport && (
-                <div className="glass bg-risk-orange/20 p-4 rounded-2xl shadow-2xl animate-fade-in border border-risk-orange/30 backdrop-blur-xl">
-                  <p className="text-[10px] text-risk-orange font-black uppercase tracking-widest mb-1 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-risk-orange animate-pulse" />
-                    LIVE COMMUNITY REPORT
-                  </p>
-                  <p className="text-sm font-bold text-white capitalize">{(latestReport.report_type || latestReport.type || 'alert').replace(/_/g, ' ')}</p>
-                  <p className="text-[10px] font-mono text-white/50 mt-1">{new Date(latestReport.timestamp || Date.now()).toLocaleTimeString()}</p>
-                </div>
-              )}
-            </div>
-
-            {/* Nearby Hazard Intelligence Panel */}
-            {nearbyHazards.length > 0 && (
-              <div className="w-full max-w-2xl mx-auto self-center pointer-events-auto">
-                <div className={`glass rounded-2xl border backdrop-blur-xl overflow-hidden transition-all ${
-                  nearbyHazards[0]?.distance_km < 3
-                    ? 'border-risk-red bg-risk-red/10 shadow-[0_0_25px_rgba(255,59,48,0.3)] animate-pulse'
-                    : 'border-risk-orange/40 bg-risk-orange/5'
-                }`}>
-                  <div className="flex items-center gap-2 px-4 py-2 border-b border-white/10">
-                    <AlertTriangle className={`w-3.5 h-3.5 shrink-0 ${ nearbyHazards[0]?.distance_km < 3 ? 'text-risk-red' : 'text-risk-orange'}`} />
-                    <p className={`text-[9px] font-black uppercase tracking-widest ${ nearbyHazards[0]?.distance_km < 3 ? 'text-risk-red' : 'text-risk-orange'}`}>
-                      {nearbyHazards[0]?.distance_km < 3 ? 'CRITICAL SLOPE IMMINENT' : 'Critical Slopes Detected Nearby'}
-                    </p>
-                    <span className="ml-auto text-[8px] font-black text-white/30 uppercase">{nearbyHazards.length} hazard{nearbyHazards.length > 1 ? 's' : ''}</span>
-                  </div>
-                  <div className="flex divide-x divide-white/10">
-                    {nearbyHazards.map((h, i) => (
-                      <div key={i} className="flex-1 px-3 py-2.5 min-w-0">
-                        <div className="flex items-baseline gap-1.5 mb-0.5">
-                          <span className="text-base font-black text-white">{h.distance_km}</span>
-                          <span className="text-[9px] text-white/40 uppercase">km</span>
-                          <span className="text-[10px] font-bold text-[#00C2FF] ml-auto">{h.direction}</span>
-                        </div>
-                        <p className="text-[8px] font-bold text-white/50 uppercase tracking-wider truncate">Slope: {h.slope_mean?.toFixed(0) ?? '--'}° · Failure Risk</p>
-                        <div className="mt-1 h-1 rounded-full bg-white/10 overflow-hidden">
-                          <div
-                            className={`h-full rounded-full ${ h.fos_seismic < 0.8 ? 'bg-risk-red' : h.fos_seismic < 1.0 ? 'bg-risk-orange' : 'bg-yellow-400'}`}
-                            style={{ width: `${Math.min(100, Math.max(10, (1.5 - (h.fos_seismic ?? 1)) / 1.5 * 100))}%` }}
-                          />
-                        </div>
-                      </div>
                     ))}
                   </div>
                 </div>
-              </div>
-            )}
 
-            {/* Bottom Panel: Route Status */}
-            <div className="glass pointer-events-auto rounded-3xl p-5 border-white/10 backdrop-blur-xl flex items-center justify-between border-t border-[#00C2FF]/30 w-full max-w-2xl mx-auto self-center">
-              <div>
-                <p className="text-3xl font-black text-[#00C2FF]">
-                  {Math.max(0, (routeResult?.route.distance_km - (navIndex / routeResult?.route.segments.length) * routeResult?.route.distance_km)).toFixed(1)} <span className="text-sm text-white/50 uppercase">km remaining</span>
-                </p>
-                <div className="flex items-center gap-3 mt-1">
-                  <div className="flex gap-1.5 items-center">
-                    <span className="w-2 h-2 rounded-full bg-risk-green shadow-[0_0_8px_#30D158]" />
-                    <span className="text-xs font-bold text-white/70 uppercase tracking-widest">
-                      ETA: {Math.max(1, Math.round((Math.max(0, (routeResult?.route.distance_km - (navIndex / routeResult?.route.segments.length) * routeResult?.route.distance_km)) / 40) * 60))} min <span className="text-[8px] opacity-40">@40KM/H</span>
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-[10px] uppercase font-black text-white/40 tracking-widest mb-1">Current Risk Level</p>
-                <RiskBadge level={carPosition?.risk || 'GREEN'} className="scale-110 origin-right" />
               </div>
             </div>
+
           </div>
         )}
 
-        {/* SOS + Blockage — absolute positioned, outside nav overlay div */}
+        {/* SOS + Blockage quick triggers outside nav overlay */}
         {isNavigating && (
           <>
             <SOSButton carPosition={carPosition} region={selectedRegion?.key} />
@@ -1609,57 +1287,62 @@ const SafeRoute = () => {
           </>
         )}
 
-        {/* Offline Banner */}
-        {isOffline && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[2000] glass px-6 py-3 rounded-full border-risk-orange/30 shadow-2xl flex items-center gap-3">
-            <span className="w-2 h-2 rounded-full bg-risk-orange animate-pulse" />
-            <p className="text-xs font-black uppercase tracking-widest text-risk-orange">📴 Offline — using cached route</p>
-          </div>
-        )}
-
         {/* Route Risk Certificate Overlay */}
-        {showCertificate && routeResult && (
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-xl z-[3000] flex items-center justify-center p-6 print:bg-white print:text-black animate-fade-in">
-            <div className="bg-[#111] print:bg-white border border-white/10 print:border-[#eee] p-8 rounded-3xl max-w-md w-full shadow-2xl">
-              <h2 className="text-2xl font-black uppercase tracking-tighter mb-6 flex items-center gap-3">
-                <RouteIcon className="w-6 h-6 text-accent" /> LITHOS Route Safety Report
+        {showCertificate && activeRoute && (
+          <div className="absolute inset-0 bg-black/85 backdrop-blur-2xl z-[3000] flex items-center justify-center p-6 animate-fade-in">
+            <div className="bg-slate-950 border border-slate-800 p-7 rounded-3xl max-w-md w-full shadow-2xl">
+              <h2 className="text-xl font-black uppercase tracking-tight text-white mb-4 flex items-center gap-2.5">
+                <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+                <span>Route Safety Clearance</span>
               </h2>
 
-              <div className="space-y-4 mb-8">
-                <div className="flex justify-between border-b border-white/10 print:border-[#eee] pb-2">
-                  <span className="text-xs font-bold uppercase opacity-60">Route</span>
-                  <span className="text-xs font-black uppercase text-right max-w-[200px] truncate">{startQuery} → {endQuery}</span>
+              <div className="space-y-3 mb-6 text-xs text-slate-300">
+                <div className="flex justify-between border-b border-slate-800 pb-2">
+                  <span className="text-slate-500 font-semibold uppercase text-[10px]">Corridor</span>
+                  <span className="font-bold text-white max-w-[220px] truncate">{startQuery} ➔ {endQuery}</span>
                 </div>
-                <div className="flex justify-between border-b border-white/10 print:border-[#eee] pb-2">
-                  <span className="text-xs font-bold uppercase opacity-60">Distance</span>
-                  <span className="text-xs font-black uppercase">{routeResult.route.distance_km} km</span>
+                <div className="flex justify-between border-b border-slate-800 pb-2">
+                  <span className="text-slate-500 font-semibold uppercase text-[10px]">Selected Route</span>
+                  <span className="font-bold text-cyan-400">{activeRoute.title}</span>
                 </div>
-                <div className="flex justify-between border-b border-white/10 print:border-[#eee] pb-2">
-                  <span className="text-xs font-bold uppercase opacity-60">Risk Summary</span>
-                  <div className="text-right">
-                    <p className="text-xs font-black text-risk-green">Safe: {(routeResult.route.risk_summary.GREEN / (routeResult.route.risk_summary.RED + routeResult.route.risk_summary.ORANGE + routeResult.route.risk_summary.GREEN) * routeResult.route.distance_km).toFixed(1)} km</p>
-                    <p className="text-xs font-black text-risk-orange">Caution: {(routeResult.route.risk_summary.ORANGE / (routeResult.route.risk_summary.RED + routeResult.route.risk_summary.ORANGE + routeResult.route.risk_summary.GREEN) * routeResult.route.distance_km).toFixed(1)} km</p>
-                    <p className="text-xs font-black text-risk-red">Danger: {(routeResult.route.risk_summary.RED / (routeResult.route.risk_summary.RED + routeResult.route.risk_summary.ORANGE + routeResult.route.risk_summary.GREEN) * routeResult.route.distance_km).toFixed(1)} km</p>
-                  </div>
+                <div className="flex justify-between border-b border-slate-800 pb-2">
+                  <span className="text-slate-500 font-semibold uppercase text-[10px]">Distance & Grade</span>
+                  <span className="font-bold text-white">{activeRoute.distance_km} km · Max {activeRoute.max_slope_deg}°</span>
                 </div>
-                {routeResult.route.max_risk_level === 'RED' && (
-                  <div className="flex justify-between border-b border-white/10 print:border-[#eee] pb-2">
-                    <span className="text-xs font-bold uppercase opacity-60">Recommendation</span>
-                    <span className="text-xs font-black uppercase text-risk-red">CAUTION ADVISED</span>
-                  </div>
-                )}
-                <div className="flex justify-between pt-2">
-                  <span className="text-[10px] font-mono opacity-40">Generated: {new Date().toLocaleString()}</span>
+                <div className="flex justify-between border-b border-slate-800 pb-2">
+                  <span className="text-slate-500 font-semibold uppercase text-[10px]">Min Factor of Safety</span>
+                  <span className={`font-mono font-black ${activeRoute.min_fos < 1.05 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                    FoS {activeRoute.min_fos?.toFixed(2) || '1.45'}
+                  </span>
+                </div>
+                <div className="flex justify-between pt-1 text-[10px] text-slate-500">
+                  <span>Certified: LITHOS A* Risk Engine</span>
+                  <span>{new Date().toLocaleTimeString()}</span>
                 </div>
               </div>
 
-              <div className="flex gap-4 print:hidden">
-                <button onClick={() => window.print()} className="flex-1 bg-white/10 hover:bg-white/20 py-3 rounded-xl text-xs font-black uppercase transition-all">Save PDF</button>
-                <button onClick={() => setShowCertificate(false)} className="flex-1 bg-accent text-bg hover:scale-105 py-3 rounded-xl text-xs font-black uppercase transition-all shadow-glow">Start New Route</button>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowCertificate(false)}
+                  className="flex-1 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold text-xs border border-slate-800"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={() => {
+                    setShowCertificate(false);
+                    setIsNavigating(false);
+                    setIsDrivingMode(false);
+                  }}
+                  className="flex-1 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-lg shadow-cyan-600/20"
+                >
+                  Plan New Route
+                </button>
               </div>
             </div>
           </div>
         )}
+
       </div>
     </div>
   );

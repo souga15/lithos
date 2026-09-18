@@ -63,6 +63,8 @@ const CesiumTerrain3D = ({
   onLoadDemoPreset,
   onStartDemoSimulation,
   onStartLiveNavigation,
+  selectedRouteIdx = 0,
+  onSelectRoute,
 }) => {
   const containerRef   = useRef(null);
   const viewerRef      = useRef(null);
@@ -659,7 +661,10 @@ const CesiumTerrain3D = ({
     const old = viewer.entities.values.filter(e => e.id?.startsWith?.('route-'));
     old.forEach(e => viewer.entities.remove(e));
 
-    const segments = routeResult?.route?.segments;
+    // Determine active route and alternatives
+    const allRoutes = routeResult?.routes || (routeResult?.route ? [routeResult.route, ...(routeResult.alternative_routes || [])] : []);
+    const activeRoute = allRoutes[selectedRouteIdx] || allRoutes[0] || routeResult?.route;
+    const segments = activeRoute?.segments;
     if (!segments || segments.length < 2) return;
 
     // Group adjacent segments by risk level for crisp clamped rendering with dark outline
@@ -699,7 +704,7 @@ const CesiumTerrain3D = ({
       chunks.push(curChunk);
     }
 
-    // 1. Primary Safe Route Chunks with high-contrast outlines
+    // 1. Primary Selected Route Chunks with high-contrast outlines
     chunks.forEach((chunk, cIdx) => {
       viewer.entities.add({
         id: `route-chunk-${cIdx}`,
@@ -716,30 +721,31 @@ const CesiumTerrain3D = ({
       });
     });
 
-    // 2. Alternative routes (rendered as dashed slate lines)
-    if (routeResult?.alternative_routes && Array.isArray(routeResult.alternative_routes)) {
-      routeResult.alternative_routes.forEach((alt, aIdx) => {
-        if (!alt?.segments || alt.segments.length < 2) return;
-        const altPositions = alt.segments
-          .filter(s => s && s.lat != null && (s.lon != null || s.lng != null))
-          .map(s => Cesium.Cartesian3.fromDegrees(parseFloat(s.lon ?? s.lng), parseFloat(s.lat)));
+    // 2. Alternative routes (rendered in their respective risk tier colors: Safe, Moderate, Danger)
+    allRoutes.forEach((r, rIdx) => {
+      if (rIdx === selectedRouteIdx) return;
+      if (!r?.segments || r.segments.length < 2) return;
+      const altPositions = r.segments
+        .filter(s => s && s.lat != null && (s.lon != null || s.lng != null))
+        .map(s => Cesium.Cartesian3.fromDegrees(parseFloat(s.lon ?? s.lng), parseFloat(s.lat)));
 
-        if (altPositions.length >= 2) {
-          viewer.entities.add({
-            id: `route-alt-${aIdx}`,
-            polyline: {
-              positions: altPositions,
-              width: 5,
-              material: new Cesium.PolylineDashMaterialProperty({
-                color: Cesium.Color.fromCssColorString('#94A3B8').withAlpha(0.75),
-                dashLength: 16.0,
-              }),
-              clampToGround: true,
-            },
-          });
-        }
-      });
-    }
+      if (altPositions.length >= 2) {
+        const altColor = r.color || (r.risk_level === 'RED' ? '#EF4444' : r.risk_level === 'ORANGE' ? '#F59E0B' : '#10B981');
+        viewer.entities.add({
+          id: `route-alt-${rIdx}`,
+          name: r.title || `Route Option ${rIdx + 1}`,
+          polyline: {
+            positions: altPositions,
+            width: 5,
+            material: new Cesium.PolylineDashMaterialProperty({
+              color: Cesium.Color.fromCssColorString(altColor).withAlpha(0.8),
+              dashLength: 18.0,
+            }),
+            clampToGround: true,
+          },
+        });
+      }
+    });
 
     // 3. Precision Camera Framing: Compute complete bounding rectangle for route
     const lonSpan = maxLon - minLon;
@@ -749,7 +755,7 @@ const CesiumTerrain3D = ({
 
     const routeRect = Cesium.Rectangle.fromDegrees(
       minLon - lonPad,
-      minLat - latPad * 1.6, // South offset gives beautiful 3D terrain pitch looking north
+      minLat - latPad * 1.6,
       maxLon + lonPad,
       maxLat + latPad * 0.8
     );
@@ -763,7 +769,7 @@ const CesiumTerrain3D = ({
       },
       duration: 2.2,
     });
-  }, [routeResult, viewerReady]);
+  }, [routeResult, selectedRouteIdx, viewerReady]);
 
   // ── Start / End markers ───────────────────────────────────────────────────
   useEffect(() => {
@@ -833,7 +839,7 @@ const CesiumTerrain3D = ({
     }
   }, [start, end, isNavigating, viewerReady]);
 
-  // ── Navigation: car marker + follow camera ───────────────────────────────
+  // ── Navigation: car marker + Google Maps 3D follow camera ─────────────────
   useEffect(() => {
     const viewer = viewerRef.current;
     if (!viewer || viewer.isDestroyed()) return;
@@ -844,7 +850,7 @@ const CesiumTerrain3D = ({
       return;
     }
 
-    const carColor = carPosition.risk === 'RED' ? '#FF3B30' : carPosition.risk === 'ORANGE' ? '#FF9500' : '#00C2FF';
+    const carColor = carPosition.risk === 'RED' ? '#FF3B30' : carPosition.risk === 'ORANGE' ? '#FF9500' : '#00F0FF';
     if (typeof carPosition.lng !== 'number' || typeof carPosition.lat !== 'number') return;
     const pos = Cesium.Cartesian3.fromDegrees(carPosition.lng, carPosition.lat, 25);
 
@@ -853,8 +859,24 @@ const CesiumTerrain3D = ({
       viewer.entities.add({
         id: 'car-marker',
         position: pos,
-        point: { pixelSize: 20, color: Cesium.Color.fromCssColorString(carColor), outlineColor: Cesium.Color.WHITE, outlineWidth: 3, heightReference: Cesium.HeightReference.CLAMP_TO_GROUND },
-        label: { text: '▲ VEHICLE', font: 'bold 11px Inter', fillColor: Cesium.Color.fromCssColorString(carColor), outlineColor: Cesium.Color.BLACK, outlineWidth: 2, style: Cesium.LabelStyle.FILL_AND_OUTLINE, verticalOrigin: Cesium.VerticalOrigin.BOTTOM, pixelOffset: new Cesium.Cartesian2(0, -24), heightReference: Cesium.HeightReference.CLAMP_TO_GROUND },
+        point: {
+          pixelSize: 22,
+          color: Cesium.Color.fromCssColorString(carColor),
+          outlineColor: Cesium.Color.WHITE,
+          outlineWidth: 3.5,
+          heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
+        },
+        label: {
+          text: '▲ DRIVING',
+          font: 'bold 11px Inter, sans-serif',
+          fillColor: Cesium.Color.fromCssColorString(carColor),
+          outlineColor: Cesium.Color.BLACK,
+          outlineWidth: 3,
+          style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          pixelOffset: new Cesium.Cartesian2(0, -22),
+          heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
+        },
       });
     } else {
       carEntity.position = pos;
@@ -862,12 +884,12 @@ const CesiumTerrain3D = ({
       if (carEntity.label) carEntity.label.fillColor = Cesium.Color.fromCssColorString(carColor);
     }
 
-    // Smooth camera tracking to car position without underground collision
+    // Google Maps 3D Chase Camera tracking car heading
     const now = Date.now();
-    if (now - lastCamFollowRef.current > 260) {
+    if (now - lastCamFollowRef.current > 180) {
       lastCamFollowRef.current = now;
 
-      // Dynamically sample actual terrain elevation at vehicle location
+      // Sample terrain elevation at vehicle position
       let groundHeight = 1600;
       try {
         const carto = Cesium.Cartographic.fromDegrees(carPosition.lng, carPosition.lat);
@@ -875,18 +897,29 @@ const CesiumTerrain3D = ({
         if (typeof sample === 'number' && sample > 50) {
           groundHeight = sample;
         } else if (carPosition.lat > 27.0) {
-          // Himalayan pass corridor (Sikkim NH-310 climbs from Gangtok 1,650m to Nathu La 4,310m)
           const prog = Math.min(Math.max((carPosition.lng - 88.61) / (88.83 - 88.61), 0), 1);
           groundHeight = 1650 + prog * 2660;
         }
       } catch (_) {}
 
-      // Keep camera safely 1,300m ABOVE mountain terrain, looking down at -38 deg
-      const camHeight = Math.max(groundHeight + 1300, 2600);
+      // Heading in radians (derived from segment direction)
+      const headingDeg = carPosition.heading ?? 0;
+      const headingRad = Cesium.Math.toRadians(headingDeg);
+
+      // Chase camera positioned ~240m behind the car looking forward in heading direction
+      const camOffsetDist = 0.0024;
+      const camLng = carPosition.lng - Math.sin(headingRad) * camOffsetDist;
+      const camLat = carPosition.lat - Math.cos(headingRad) * camOffsetDist;
+      const camHeight = Math.max(groundHeight + 95, 200);
+
       viewer.camera.flyTo({
-        destination: Cesium.Cartesian3.fromDegrees(carPosition.lng, carPosition.lat - 0.011, camHeight),
-        orientation: { heading: Cesium.Math.toRadians(0), pitch: Cesium.Math.toRadians(-38), roll: 0 },
-        duration: 0.25,
+        destination: Cesium.Cartesian3.fromDegrees(camLng, camLat, camHeight),
+        orientation: {
+          heading: headingRad,
+          pitch:   Cesium.Math.toRadians(-22),
+          roll:    0
+        },
+        duration: 0.22,
       });
     }
   }, [carPosition, isNavigating]);
@@ -1494,24 +1527,24 @@ const CesiumTerrain3D = ({
 
       {/* Floating 3D Route Quick-Action Bar (Shown when route calculated and not yet navigating) */}
       {routeResult && !isNavigating && (
-        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-30 pointer-events-auto bg-slate-950/95 border border-cyan-500/50 rounded-2xl p-2.5 px-4 shadow-2xl backdrop-blur-xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2">
+        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-30 pointer-events-auto bg-[#090d1c]/95 border border-slate-800 rounded-2xl p-2.5 px-4 shadow-xl backdrop-blur-xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2">
           <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse" />
+            <div className="w-2 h-2 rounded-full bg-emerald-400" />
             <div>
               <div className="text-xs font-bold text-white flex items-center gap-2">
                 <span>{routeResult.route?.distance_km || 0} km</span>
-                <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${
+                <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium uppercase tracking-wider ${
                   routeResult.route?.max_risk_level === 'RED'
-                    ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                    ? 'bg-rose-500/15 text-rose-300'
                     : routeResult.route?.max_risk_level === 'ORANGE'
-                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                    : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                    ? 'bg-amber-500/15 text-amber-300'
+                    : 'bg-emerald-500/15 text-emerald-300'
                 }`}>
                   {routeResult.route?.max_risk_level || 'SAFE'}
                 </span>
               </div>
               <div className="text-[10px] text-slate-400">
-                3D Corridor Calculated
+                Corridor Calculated
               </div>
             </div>
           </div>
@@ -1522,10 +1555,10 @@ const CesiumTerrain3D = ({
             {onStartDemoSimulation && (
               <button
                 onClick={() => onStartDemoSimulation(demoSpeed)}
-                className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-600 to-sky-600 hover:from-cyan-500 hover:to-sky-500 text-white text-xs font-bold flex items-center gap-1.5 shadow-md active:scale-95 transition-all cursor-pointer"
+                className="px-3.5 py-1.5 rounded-xl bg-[#2B9EFF] hover:bg-[#2087de] text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
               >
                 <Play className="w-3.5 h-3.5 fill-white" />
-                <span>Start 3D Simulation</span>
+                <span>Start 3D Navigation</span>
               </button>
             )}
             {onStartLiveNavigation && (
