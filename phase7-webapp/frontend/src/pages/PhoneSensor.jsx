@@ -348,26 +348,6 @@ const PhoneSensor = () => {
         </div>
       </div>
 
-      {/* Phone Demonstration Quick Connect Banner */}
-      <div className="w-full max-w-md mb-4 p-3 rounded-xl bg-[#00C2FF]/5 border border-[#00C2FF]/20 flex items-center justify-between text-xs">
-        <div className="flex items-center gap-2.5">
-          <Smartphone className="w-4 h-4 text-[#00C2FF] shrink-0 animate-pulse" />
-          <div className="leading-snug">
-            <span className="font-bold text-white text-[11px] block">Live Phone Sensor Demonstration</span>
-            <span className="text-[10px] text-white/50 font-mono">
-              Open on phone: <a 
-                href={`http://${window.location.hostname || 'localhost'}:5173/sensor.html`} 
-                target="_blank" 
-                rel="noreferrer" 
-                className="text-[#00C2FF] underline font-bold hover:text-white"
-              >
-                http://{window.location.hostname || 'localhost'}:5173/sensor.html
-              </a>
-            </span>
-          </div>
-        </div>
-      </div>
-
       {/* Main Circular Dial Telemetry Display */}
       <div className="relative mb-6">
         <svg viewBox="0 0 200 200" className="w-56 h-56">
