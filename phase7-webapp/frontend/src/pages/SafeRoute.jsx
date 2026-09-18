@@ -350,7 +350,11 @@ const SafeRoute = () => {
       }
     } catch (err) {
       console.error(err);
-      alert('Error calculating route. Please ensure points are within the selected region.');
+      if (!err.response) {
+        alert('Connection Error: Cannot reach LITHOS Backend API (Port 8000). Please ensure the backend is running.');
+      } else {
+        alert(err.response?.data?.detail || 'Error calculating route. Please ensure points are within the selected region.');
+      }
     } finally {
       setLoading(false);
     }

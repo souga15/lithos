@@ -164,12 +164,15 @@ def estimate_runout(cell: Dict, all_cells: List[Dict]) -> Dict:
     cell_elev = cell.get("elevation_mean", 500.0)
     soil_type = cell.get("soil_type", "")
 
-    # ── Passing 1: Initial H estimate using 3km radius
+    # ── Passing 1: Initial H estimate using 3km radius (with fast bounding box pre-filter)
     initial_radius = 3.0
+    deg_box1 = (initial_radius / 111.0) * 1.05
     neighbours = [
         c["elevation_mean"]
         for c in all_cells
-        if (_haversine(lat, lon, c["center_lat"], c["center_lon"]) < initial_radius
+        if (abs(c["center_lat"] - lat) < deg_box1
+            and abs(c["center_lon"] - lon) < deg_box1
+            and _haversine(lat, lon, c["center_lat"], c["center_lon"]) < initial_radius
             and c["cell_id"] != cell["cell_id"]
             and c.get("elevation_mean", cell_elev) < cell_elev)
     ]
@@ -185,12 +188,15 @@ def estimate_runout(cell: Dict, all_cells: List[Dict]) -> Dict:
     # Initial L_m to refine radius
     L_initial = H_initial / math.tan(math.radians(travel_angle))
     
-    # ── Passing 2: Refined H using L_m / 1000.0 (dynamic zone)
+    # ── Passing 2: Refined H using L_m / 1000.0 (dynamic zone with bounding box pre-filter)
     refined_radius = max(1.0, L_initial / 1000.0)
+    deg_box2 = (refined_radius / 111.0) * 1.05
     neighbours_refined = [
         c["elevation_mean"]
         for c in all_cells
-        if (_haversine(lat, lon, c["center_lat"], c["center_lon"]) < refined_radius
+        if (abs(c["center_lat"] - lat) < deg_box2
+            and abs(c["center_lon"] - lon) < deg_box2
+            and _haversine(lat, lon, c["center_lat"], c["center_lon"]) < refined_radius
             and c["cell_id"] != cell["cell_id"]
             and c.get("elevation_mean", cell_elev) < cell_elev)
     ]
