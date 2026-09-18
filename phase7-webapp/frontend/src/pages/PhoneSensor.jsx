@@ -37,6 +37,7 @@ const PhoneSensor = () => {
   const [simulatedAngle, setSimulatedAngle] = useState(0);
   const [batteryLevel, setBatteryLevel] = useState(100);
   const [permissionsGranted, setPermissionsGranted] = useState(false);
+  const [remoteDevice, setRemoteDevice] = useState(null);
 
   const TILT_THRESHOLD = 3.0; // degrees (IS 14458 / MoRTH Trigger Level 2)
   const lastAlertTime = useRef(0);
@@ -62,6 +63,69 @@ const PhoneSensor = () => {
     if (!window.DeviceMotionEvent && !window.DeviceOrientationEvent) {
       setMotionSupported(false);
     }
+  }, []);
+
+  // Listen to live WebSocket alerts for incoming remote phone sensor signals (for demonstration)
+  useEffect(() => {
+    const wsUrl = API_BASE_URL.replace('http', 'ws') + '/ws/alerts';
+    let ws;
+    let reconnectTimer;
+
+    const connect = () => {
+      try {
+        ws = new WebSocket(wsUrl);
+        ws.onmessage = (ev) => {
+          try {
+            const d = JSON.parse(ev.data);
+            if (d.type === 'sensor_alert') {
+              const val = parseFloat(d.value) || 0;
+              setRemoteDevice({
+                id: d.sensor_id,
+                value: val,
+                time: new Date(d.timestamp || Date.now()).toLocaleTimeString(),
+                lat: d.lat,
+                lon: d.lon,
+                message: d.message
+              });
+              setTilt({
+                x: (val * 0.7).toFixed(1),
+                y: (val * 0.7).toFixed(1),
+                z: val.toFixed(1)
+              });
+              setSimulatedAngle(val);
+              setIsMonitoring(true);
+              setStatus(val > TILT_THRESHOLD ? 'triggered' : 'active');
+              setTotalAlerts(prev => prev + 1);
+              if (d.lat && d.lon) {
+                setLocation({ lat: parseFloat(d.lat), lon: parseFloat(d.lon) });
+              }
+              setAlertLog(prev => [
+                {
+                  id: Date.now() + Math.random(),
+                  time: new Date(d.timestamp || Date.now()).toLocaleTimeString(),
+                  tilt: val.toFixed(1),
+                  lat: Number(d.lat || 0).toFixed(4),
+                  lon: Number(d.lon || 0).toFixed(4),
+                  sensorId: d.sensor_id,
+                  status: val > 5.0 ? 'CRITICAL' : 'WARNING'
+                },
+                ...prev.slice(0, 14)
+              ]);
+            }
+          } catch (_) {}
+        };
+        ws.onclose = () => {
+          reconnectTimer = setTimeout(connect, 3000);
+        };
+      } catch (_) {}
+    };
+
+    connect();
+
+    return () => {
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (ws) ws.close();
+    };
   }, []);
 
   // One-tap automated hardware authorization routine
@@ -254,7 +318,9 @@ const PhoneSensor = () => {
     URL.revokeObjectURL(url);
   };
 
-  const currentTilt = isSimulatedMode ? simulatedAngle : (parseFloat(tilt.z) || 0);
+  const currentTilt = remoteDevice
+    ? remoteDevice.value
+    : (isSimulatedMode ? simulatedAngle : (parseFloat(tilt.z) || 0));
   const percentFill = Math.min(100, (currentTilt / 10) * 100);
 
   return (
@@ -277,8 +343,28 @@ const PhoneSensor = () => {
 
         <div className="text-right">
           <span className="font-mono text-xs font-bold text-[#00C2FF] bg-[#00C2FF]/10 border border-[#00C2FF]/20 px-2 py-1 rounded-md">
-            {sensorId}
+            {remoteDevice ? remoteDevice.id : sensorId}
           </span>
+        </div>
+      </div>
+
+      {/* Phone Demonstration Quick Connect Banner */}
+      <div className="w-full max-w-md mb-4 p-3 rounded-xl bg-[#00C2FF]/5 border border-[#00C2FF]/20 flex items-center justify-between text-xs">
+        <div className="flex items-center gap-2.5">
+          <Smartphone className="w-4 h-4 text-[#00C2FF] shrink-0 animate-pulse" />
+          <div className="leading-snug">
+            <span className="font-bold text-white text-[11px] block">Live Phone Sensor Demonstration</span>
+            <span className="text-[10px] text-white/50 font-mono">
+              Open on phone: <a 
+                href={`http://${window.location.hostname || 'localhost'}:5173/sensor.html`} 
+                target="_blank" 
+                rel="noreferrer" 
+                className="text-[#00C2FF] underline font-bold hover:text-white"
+              >
+                http://{window.location.hostname || 'localhost'}:5173/sensor.html
+              </a>
+            </span>
+          </div>
         </div>
       </div>
 
@@ -301,7 +387,7 @@ const PhoneSensor = () => {
 
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <div className={`text-4xl font-black font-mono tracking-tight transition-colors ${
-            status === 'triggered' ? 'text-risk-red' : status === 'active' ? 'text-[#00C2FF]' : 'text-white/60'
+            status === 'triggered' ? 'text-risk-red animate-pulse' : status === 'active' ? 'text-[#00C2FF]' : 'text-white/60'
           }`}>
             {currentTilt.toFixed(1)}°
           </div>
@@ -336,6 +422,30 @@ const PhoneSensor = () => {
           </div>
         </div>
       </div>
+
+      {/* Remote Live Phone Telemetry Badge (Demonstration Mode) */}
+      {remoteDevice && (
+        <div className="w-full max-w-md -mt-2 mb-4 p-3 rounded-xl bg-risk-red/10 border border-risk-red/40 flex items-center justify-between shadow-[0_0_20px_rgba(255,59,48,0.25)] animate-fade-in">
+          <div className="flex items-center gap-2.5">
+            <span className="relative flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-risk-red opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-risk-red"></span>
+            </span>
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-wider text-risk-red flex items-center gap-1.5">
+                <span>REMOTE PHONE TRIGGER DETECTED</span>
+              </div>
+              <div className="text-xs font-mono font-bold text-white">
+                Station <b className="text-[#00C2FF]">{remoteDevice.id}</b>: <span className="text-risk-red font-black">{remoteDevice.value.toFixed(1)}° Slope</span>
+              </div>
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-[10px] font-mono text-white/60">{remoteDevice.time}</div>
+            <div className="text-[9px] font-mono font-bold text-risk-green">LIVE STREAM</div>
+          </div>
+        </div>
+      )}
 
       {/* Axis Vector Breakdown */}
       {isMonitoring && (
@@ -496,6 +606,7 @@ const PhoneSensor = () => {
                 <div className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-risk-red animate-pulse" />
                   <span className="text-risk-red font-bold">{entry.tilt}° Tilt</span>
+                  {entry.sensorId && <span className="text-[#00C2FF] font-bold">[{entry.sensorId}]</span>}
                   <span className="text-white/40">[{entry.lat}, {entry.lon}]</span>
                 </div>
                 <span className="text-white/40">{entry.time}</span>

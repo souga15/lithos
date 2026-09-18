@@ -141,7 +141,7 @@ const Home = ({ setAlertCount }) => {
     const ws = new WebSocket(`${wsUrl}/ws/alerts`);
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
-      if (data.type === 'connected') return;
+      if (data.type === 'connected' || data.type === 'sensor_alert') return;
       setActiveAlert(data);
       setAlertCount(prev => prev + 1);
     };
