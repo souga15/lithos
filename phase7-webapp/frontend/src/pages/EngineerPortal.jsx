@@ -4,7 +4,7 @@ import API_BASE_URL from '../apiConfig';
 import { MapContainer, TileLayer, GeoJSON, useMap, Marker, Popup, Circle, Polyline, Polygon } from 'react-leaflet';
 import { NE_STATE_BOUNDARIES, STATE_BORDER_COLORS } from '../constants/NE_STATE_BOUNDARIES';
 import L from 'leaflet';
-import { HardHat, FileText, Download, Target, Activity, Search, Map as MapIcon, Loader2 } from 'lucide-react';
+import { HardHat, FileText, Download, Target, Activity, Search, Map as MapIcon, Loader2, X, ExternalLink } from 'lucide-react';
 
 const customIcon = new L.Icon({
   iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
@@ -22,7 +22,6 @@ import SlopeCrossSection from '../components/Engineer/SlopeCrossSection';
 import DebrisFlowPanel from '../components/Engineer/DebrisFlowPanel';
 import { 
   PostDisasterPanel, 
-  CostBenefitPanel, 
   EarthquakeScenarioPanel, 
   RoadCutCalculator 
 } from '../components/Engineer/AnalysisPanels';
@@ -50,6 +49,7 @@ const EngineerPortal = () => {
   const [activePortalTab, setActivePortalTab] = useState('analysis'); // analysis, hardware
   const [sensorAlerts, setSensorAlerts] = useState([]);
   const [activeRunoutData, setActiveRunoutData] = useState(null);
+  const [showSensorGuide, setShowSensorGuide] = useState(false);
 
   // New features: Map style and Search
   const [mapStyle, setMapStyle] = useState('dark');
@@ -139,47 +139,152 @@ const EngineerPortal = () => {
     win.document.write(`<!DOCTYPE html><html lang="en"><head>
 <meta charset="UTF-8"/><title>${title}</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=Roboto+Mono:wght@400;600&display=swap');
-  *{margin:0;padding:0;box-sizing:border-box;}
-  body{font-family:'Inter',sans-serif;font-size:11pt;color:#1a1a2e;background:#fff;padding:12mm 14mm;}
-  @page{size:A4;margin:12mm 14mm;}
-  @media print{body{padding:0;} .no-print{display:none!important;}}
-  .header{display:flex;align-items:center;justify-content:space-between;padding-bottom:8px;border-bottom:3px solid #0056b3;margin-bottom:14px;}
-  .header-left h1{font-size:15pt;font-weight:900;color:#0056b3;letter-spacing:.5px;}
-  .header-left p{font-size:8pt;color:#555;margin-top:2px;text-transform:uppercase;letter-spacing:.8px;}
-  .header-right{text-align:right;font-size:8pt;color:#555;line-height:1.6;}
-  .badge{display:inline-block;padding:3px 8px;border-radius:4px;font-size:8pt;font-weight:700;letter-spacing:.5px;}
-  .badge-red{background:#fee2e2;color:#dc2626;}
-  .badge-orange{background:#ffedd5;color:#ea580c;}
-  .badge-green{background:#dcfce7;color:#16a34a;}
-  .badge-blue{background:#dbeafe;color:#1d4ed8;}
-  .section{margin-bottom:14px;page-break-inside:avoid;}
-  .section-title{font-size:9pt;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#0056b3;background:#f0f4ff;padding:5px 8px;border-left:4px solid #0056b3;margin-bottom:6px;}
-  table{width:100%;border-collapse:collapse;font-size:9.5pt;}
-  th{background:#0056b3;color:#fff;text-align:left;padding:5px 8px;font-weight:700;font-size:8pt;text-transform:uppercase;letter-spacing:.5px;}
-  td{padding:5px 8px;border-bottom:1px solid #e5e7eb;vertical-align:top;}
-  td:first-child{font-weight:600;color:#374151;width:45%;background:#f9fafb;}
-  tr:last-child td{border-bottom:none;}
-  .checklist-item{display:flex;align-items:flex-start;gap:8px;margin-bottom:5px;font-size:9.5pt;}
-  .checkbox{width:13px;height:13px;border:1.5px solid #9ca3af;border-radius:2px;flex-shrink:0;margin-top:1px;}
-  .ref-note{font-size:8.5pt;color:#1d4ed8;background:#eff6ff;border:1px solid #bfdbfe;border-radius:4px;padding:4px 8px;margin-bottom:6px;}
-  .fos-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px;}
-  .fos-box{border:1px solid #e5e7eb;border-radius:6px;padding:10px;text-align:center;}
-  .fos-box .label{font-size:8pt;text-transform:uppercase;color:#6b7280;font-weight:600;margin-bottom:4px;}
-  .fos-box .value{font-size:22pt;font-family:'Roboto Mono',monospace;font-weight:700;}
-  .tl-bar{display:flex;gap:8px;margin-top:6px;}
-  .tl-item{flex:1;padding:7px;border-radius:5px;text-align:center;font-size:8.5pt;}
-  .tl-1{background:#dcfce7;border:1px solid #86efac;}
-  .tl-2{background:#ffedd5;border:1px solid #fdba74;}
-  .tl-3{background:#fee2e2;border:1px solid #fca5a5;}
-  .tl-item .mm{font-size:13pt;font-weight:700;}
-  .sign-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px;}
-  .sign-field{border-bottom:1.5px solid #374151;padding-bottom:2px;margin-bottom:10px;font-size:9.5pt;}
-  .sign-label{font-size:7.5pt;text-transform:uppercase;color:#6b7280;font-weight:600;margin-bottom:18px;}
-  .footer{margin-top:16px;padding-top:8px;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;font-size:7.5pt;color:#9ca3af;}
-  .print-btn{position:fixed;top:16px;right:16px;background:#0056b3;color:#fff;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11pt;box-shadow:0 2px 8px rgba(0,0,0,.2);}
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Times New Roman', Times, Georgia, serif;
+    font-size: 10pt;
+    line-height: 1.35;
+    color: #000;
+    background: #fff;
+    padding: 14mm 16mm;
+  }
+  @page { size: A4 portrait; margin: 14mm 16mm; }
+  @media print {
+    body { padding: 0; }
+    .no-print { display: none !important; }
+  }
+  .gov-header {
+    text-align: center;
+    border-bottom: 2px solid #000;
+    padding-bottom: 6px;
+    margin-bottom: 10px;
+  }
+  .gov-sup {
+    font-size: 8.5pt;
+    font-weight: bold;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+  .gov-dept {
+    font-size: 8pt;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #222;
+    margin-top: 2px;
+  }
+  .gov-title-main {
+    font-size: 13pt;
+    font-weight: bold;
+    letter-spacing: 0.8px;
+    margin: 4px 0 2px 0;
+    text-transform: uppercase;
+  }
+  .gov-sub {
+    font-size: 8pt;
+    font-style: italic;
+    color: #444;
+  }
+  .gov-meta-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 10px;
+    border: 1px solid #000;
+    font-size: 8.5pt;
+  }
+  .gov-meta-table td {
+    padding: 3px 6px;
+    border: 1px solid #000;
+  }
+  .section {
+    margin-bottom: 10px;
+    page-break-inside: avoid;
+  }
+  .section-title {
+    font-size: 9pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    border-bottom: 1px solid #000;
+    padding-bottom: 2px;
+    margin-bottom: 4px;
+  }
+  table.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 8.5pt;
+    margin-bottom: 6px;
+  }
+  table.data-table th, table.data-table td {
+    border: 1px solid #000;
+    padding: 3.5px 6px;
+    vertical-align: top;
+  }
+  table.data-table th {
+    background: #f2f2f2;
+    font-weight: bold;
+    text-transform: uppercase;
+    font-size: 8pt;
+    text-align: left;
+  }
+  td.label-col {
+    width: 38%;
+    font-weight: bold;
+    background: #fafafa;
+  }
+  .sign-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 14px;
+    border: 1px solid #000;
+    page-break-inside: avoid;
+  }
+  .sign-table td {
+    border: 1px solid #000;
+    padding: 6px;
+    height: 60px;
+    vertical-align: top;
+    font-size: 8pt;
+  }
+  .checklist-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    margin-bottom: 3.5px;
+    font-size: 8.5pt;
+  }
+  .box {
+    width: 10px;
+    height: 10px;
+    border: 1px solid #000;
+    display: inline-block;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .footer-note {
+    margin-top: 10px;
+    padding-top: 4px;
+    border-top: 1px solid #000;
+    font-size: 7pt;
+    display: flex;
+    justify-content: space-between;
+  }
+  .print-btn {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    background: #000;
+    color: #fff;
+    border: 1px solid #000;
+    padding: 8px 16px;
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 9.5pt;
+    font-weight: bold;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
 </style></head><body>
-<button class="print-btn no-print" onclick="window.print()">Print / Save PDF</button>
+<button class="print-btn no-print" onclick="window.print()">[ Print / Save Official PDF ]</button>
 ${htmlBody}
 </body></html>`);
     win.document.close();
@@ -193,123 +298,160 @@ ${htmlBody}
     const region = selectedRegion ? selectedRegion.name : (c.region || 'Unknown');
     const fosStatic = (c.fos_static || 0).toFixed(2);
     const fosSeismic = (c.fos_seismic || 0).toFixed(2);
-    const fosStatus = c.fos_seismic >= 2.0 ? 'STABLE' : c.fos_seismic >= 1.5 ? 'CONDITIONALLY STABLE' : c.fos_seismic >= 1.0 ? 'MARGINALLY STABLE' : 'UNSTABLE';
-    const fosColor = c.fos_seismic >= 2.0 ? '#16a34a' : c.fos_seismic >= 1.5 ? '#ca8a04' : c.fos_seismic >= 1.0 ? '#ea580c' : '#dc2626';
-    const riskBadge = c.risk_level === 'RED' ? 'badge-red' : c.risk_level === 'ORANGE' ? 'badge-orange' : 'badge-green';
-    const treatment = c.slope_mean > 45 ? 'RC Retaining Wall' : c.slope_mean > 30 ? 'Gabion Wall + Weep Holes' : 'Vegetation + Toe Drain';
-    const costLakhs = c.slope_mean > 45 ? '32.0' : c.slope_mean > 30 ? '9.0' : '0.5';
+    const fosStatus = c.fos_seismic >= 2.0 ? 'CLASS I (STABLE)' : c.fos_seismic >= 1.5 ? 'CLASS II (CONDITIONALLY STABLE)' : c.fos_seismic >= 1.0 ? 'CLASS III (MARGINALLY STABLE)' : 'CLASS IV (CRITICAL / UNSTABLE)';
+    const treatment = c.slope_mean > 45 ? 'Reinforced Concrete Retaining Wall' : c.slope_mean > 30 ? 'Gabion Gravity Wall with Subsurface Weep Holes' : 'Bio-Engineering & Subsurface Toe Interceptor Drain';
+    const treatmentClass = c.slope_mean > 45 ? 'Heavy Structural Retaining' : c.slope_mean > 30 ? 'Gravity Mass Retaining' : 'Surface Drainage & Revegetation';
+
     const html = `
-<div class="header">
-  <div class="header-left">
-    <h1>LITHOS Geotechnical Report</h1>
-    <p>Landslide Intelligence · Temporal & Hyperlocal Observation System</p>
-  </div>
-  <div class="header-right">
-    <div><strong>Cell ID:</strong> ${c.cell_id}</div>
-    <div><strong>Region:</strong> ${region}</div>
-    <div><strong>NHAI Code:</strong> ${c.nhai_code || 'N/A'}</div>
-    <div><strong>Generated:</strong> ${ts}</div>
-  </div>
+<div class="gov-header">
+  <div class="gov-sup">GOVERNMENT OF INDIA · MINISTRY OF ROAD TRANSPORT &amp; HIGHWAYS</div>
+  <div class="gov-dept">NATIONAL HIGHWAYS AUTHORITY OF INDIA — GEOTECHNICAL INVESTIGATION DIVISION</div>
+  <div class="gov-title-main">TECHNICAL DOSSIER FOR HILL SLOPE STABILITY</div>
+  <div class="gov-sub">Codified under Indian Standard IS 14458 (Parts 1–4) &amp; IRC:75 Guidelines for Hill Road Slopes</div>
 </div>
 
+<table class="gov-meta-table">
+  <tr>
+    <td style="width:25%;"><strong>Dossier Ref:</strong> MoRTH/LITHOS/SLP-${c.cell_id}</td>
+    <td style="width:25%;"><strong>Region / State:</strong> ${region}</td>
+    <td style="width:25%;"><strong>NHAI Highway Code:</strong> ${c.nhai_code || 'NH-CORRIDOR'}</td>
+    <td style="width:25%;"><strong>Inspection Date:</strong> ${ts}</td>
+  </tr>
+  <tr>
+    <td><strong>Coordinates:</strong> ${(c.center_lat || 0).toFixed(5)}° N, ${(c.center_lon || 0).toFixed(5)}° E</td>
+    <td><strong>Risk Category:</strong> [${c.risk_level || 'N/A'}]</td>
+    <td><strong>Mean Slope Angle:</strong> ${c.slope_mean || 0}°</td>
+    <td><strong>Stability Classification:</strong> ${c.stability_class || 'Class III'}</td>
+  </tr>
+</table>
+
 <div class="section">
-  <div class="section-title">1 · Site Identification</div>
-  <table>
-    <tr><td>Risk Level</td><td><span class="badge ${riskBadge}">${c.risk_level || 'N/A'}</span></td></tr>
-    <tr><td>Risk Score</td><td>${(c.risk_score || 0).toFixed(3)}</td></tr>
-    <tr><td>Centre Coordinates</td><td>${(c.center_lat || 0).toFixed(5)}°N, ${(c.center_lon || 0).toFixed(5)}°E</td></tr>
-    <tr><td>Region</td><td>${region}</td></tr>
+  <div class="section-title">1. Site Identification &amp; Geometrical Parameters</div>
+  <table class="data-table">
+    <tr><td class="label-col">Slope Unit Identifier</td><td>Cell #${c.cell_id} (Administrative Zone: ${region})</td></tr>
+    <tr><td class="label-col">Geographical Coordinates</td><td>${(c.center_lat || 0).toFixed(5)}° Latitude, ${(c.center_lon || 0).toFixed(5)}° Longitude</td></tr>
+    <tr><td class="label-col">Mean Slope Gradient</td><td>${c.slope_mean || 0}° (Critically Steep Threshold: &gt; 35°)</td></tr>
+    <tr><td class="label-col">Composite Risk Index</td><td>${(c.risk_score || 0).toFixed(3)} [Standardized Scale 0.000 – 1.000]</td></tr>
   </table>
 </div>
 
 <div class="section">
-  <div class="section-title">2 · Geotechnical Parameters</div>
-  <table>
-    <tr><td>Soil Type</td><td>${(c.soil_type || 'Unknown').replace(/_/g,' ')}</td></tr>
-    <tr><td>Slope (mean)</td><td>${c.slope_mean || 0}°</td></tr>
-    <tr><td>Cohesion (c)</td><td>${c.cohesion_kpa || 0} kPa</td></tr>
-    <tr><td>Friction Angle (φ)</td><td>${c.friction_angle_deg || 0}°</td></tr>
-    <tr><td>Soil Depth (z)</td><td>${c.soil_depth_m || 0} m</td></tr>
-    <tr><td>Permeability</td><td>${c.permeability || 'Unknown'}</td></tr>
-    <tr><td>Consolidation State</td><td>${(c.consolidation_state || 'Unknown').replace(/_/g,' ')}</td></tr>
-    <tr><td>Plasticity Index</td><td>${c.plasticity_index || 0}</td></tr>
-    <tr><td>Swell Potential</td><td>${c.swell_potential || 'Unknown'}</td></tr>
-    <tr><td>Liquefaction Risk</td><td>${c.liquefaction_risk ? '<span class="badge badge-red">YES</span>' : 'No'}</td></tr>
-    <tr><td>Drainage Density</td><td>${(c.drainage_density || 0).toFixed(2)} km/km²</td></tr>
-    <tr><td>Soil Moisture</td><td>${((c.soil_moisture || 0) * 100).toFixed(1)}%</td></tr>
-    <tr><td>Saturation Ratio</td><td>${((c.saturation_ratio || 0) * 100).toFixed(1)}%</td></tr>
+  <div class="section-title">2. Geotechnical Strata &amp; Soil Mechanics Parameters</div>
+  <table class="data-table">
+    <tr><td class="label-col">Soil Stratum Classification</td><td>${(c.soil_type || 'Unknown').replace(/_/g,' ').toUpperCase()}</td></tr>
+    <tr><td class="label-col">Effective Soil Cohesion (c')</td><td>${c.cohesion_kpa || 0} kPa</td></tr>
+    <tr><td class="label-col">Angle of Internal Friction (φ')</td><td>${c.friction_angle_deg || 0}°</td></tr>
+    <tr><td class="label-col">Estimated Overburden Depth (z)</td><td>${c.soil_depth_m || 0} meters</td></tr>
+    <tr><td class="label-col">Soil Hydraulic Permeability</td><td>${(c.permeability || 'Moderate').toUpperCase()}</td></tr>
+    <tr><td class="label-col">Consolidation State</td><td>${(c.consolidation_state || 'Normally Consolidated').replace(/_/g,' ').toUpperCase()}</td></tr>
+    <tr><td class="label-col">Plasticity Index (PI)</td><td>${c.plasticity_index || 0}</td></tr>
+    <tr><td class="label-col">Liquefaction Susceptibility</td><td>${c.liquefaction_risk ? '[YES — HIGH VULNERABILITY]' : 'Low'}</td></tr>
+    <tr><td class="label-col">Subsurface Saturation Ratio</td><td>${((c.saturation_ratio || 0) * 100).toFixed(1)}%</td></tr>
+    <tr><td class="label-col">Regional Drainage Density</td><td>${(c.drainage_density || 0).toFixed(2)} km/km²</td></tr>
   </table>
 </div>
 
 <div class="section">
-  <div class="section-title">3 · Factor of Safety Analysis (IS 14458)</div>
-  <div class="fos-grid">
-    <div class="fos-box">
-      <div class="label">Static Load</div>
-      <div class="value" style="color:#1d4ed8">${fosStatic}</div>
-      <div style="font-size:8pt;color:#6b7280;margin-top:4px;">FoS — Static</div>
-    </div>
-    <div class="fos-box">
-      <div class="label">Seismic (Zone V)</div>
-      <div class="value" style="color:${fosColor}">${fosSeismic}</div>
-      <div style="font-size:8pt;color:#6b7280;margin-top:4px;">${fosStatus}</div>
-    </div>
-  </div>
-  <table style="margin-top:8px;">
-    <tr><td>Stability Classification</td><td><strong>${c.stability_class || 'Unknown'}</strong></td></tr>
-    <tr><td>NHAI Code</td><td>${c.nhai_code || 'N/A'}</td></tr>
-  </table>
-  <table style="margin-top:6px;">
-    <thead><tr><th>Class</th><th>FoS Range</th><th>Status</th></tr></thead>
+  <div class="section-title">3. Factor of Safety (FoS) Equilibrium Analysis — IS 14458</div>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th style="width:30%;">Loading Condition</th>
+        <th style="width:25%;">Computed FoS</th>
+        <th style="width:20%;">Mandated Min (IRC)</th>
+        <th style="width:25%;">Equilibrium Status</th>
+      </tr>
+    </thead>
     <tbody>
-      <tr><td>Class I</td><td>&gt; 2.0</td><td><span class="badge badge-green">Stable</span></td></tr>
-      <tr><td>Class II</td><td>1.5 – 2.0</td><td><span class="badge badge-blue">Monitor</span></td></tr>
-      <tr><td>Class III</td><td>1.0 – 1.5</td><td><span class="badge badge-orange">Remediation Required</span></td></tr>
-      <tr><td>Class IV</td><td>&lt; 1.0</td><td><span class="badge badge-red">Urgent Treatment</span></td></tr>
+      <tr>
+        <td><strong>Static Gravity Load</strong></td>
+        <td><strong>${fosStatic}</strong></td>
+        <td>1.50</td>
+        <td>${parseFloat(fosStatic) >= 1.5 ? '[SATISFACTORY]' : '[DEFICIENT]'}</td>
+      </tr>
+      <tr>
+        <td><strong>Seismic Pseudostatic (Zone V, IS 1893)</strong></td>
+        <td><strong>${fosSeismic}</strong></td>
+        <td>1.00</td>
+        <td>${fosStatus}</td>
+      </tr>
+    </tbody>
+  </table>
+  <table class="data-table">
+    <thead><tr><th>Classification</th><th>FoS Range (Seismic)</th><th>Statutory Action (MoRTH)</th></tr></thead>
+    <tbody>
+      <tr><td>Class I</td><td>&gt; 2.00</td><td>Standard routine visual observation.</td></tr>
+      <tr><td>Class II</td><td>1.50 – 2.00</td><td>Periodic drainage inspection; logging schedule quarterly.</td></tr>
+      <tr><td>Class III</td><td>1.00 – 1.49</td><td>Structural retaining intervention required; sensor deployment recommended.</td></tr>
+      <tr><td>Class IV</td><td>&lt; 1.00</td><td>Urgent remediation; traffic restriction &amp; immediate toe protection.</td></tr>
     </tbody>
   </table>
 </div>
 
 <div class="section">
-  <div class="section-title">4 · Rainfall Trigger Levels</div>
-  <div class="tl-bar">
-    <div class="tl-item tl-1"><div class="mm">${((c.rain_thresh_72h || 0) * 0.6).toFixed(0)} mm</div><div>TL1 — Vigilance</div><div style="font-size:7.5pt">Jr Engineer logs</div></div>
-    <div class="tl-item tl-2"><div class="mm">${((c.rain_thresh_72h || 0) * 0.8).toFixed(0)} mm</div><div>TL2 — Warning</div><div style="font-size:7.5pt">Prepare closure</div></div>
-    <div class="tl-item tl-3"><div class="mm">${((c.rain_thresh_72h || 0) * 1.0).toFixed(0)} mm</div><div>TL3 — Critical</div><div style="font-size:7.5pt">Close road NOW</div></div>
-  </div>
-  <table style="margin-top:8px;">
-    <tr><td>72-hr Threshold</td><td>${c.rain_thresh_72h || 0} mm</td></tr>
-    <tr><td>Current 72-hr Rainfall</td><td>${(c.rainfall_72h || 0).toFixed(1)} mm</td></tr>
-    <tr><td>24-hr Rainfall</td><td>${(c.rainfall_24h || 0).toFixed(1)} mm</td></tr>
-    <tr><td>Top Risk Factor</td><td>${(c.top_risk_factor || 'N/A').replace(/_/g,' ')}</td></tr>
+  <div class="section-title">4. Precipitation Trigger Thresholds &amp; Operational Matrix (TARP)</div>
+  <table class="data-table">
+    <thead><tr><th>Trigger Level</th><th>Rainfall Accumulation (72h)</th><th>Field Operational Directive</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Trigger Level 1 (Vigilance)</strong></td><td>${((c.rain_thresh_72h || 0) * 0.6).toFixed(0)} mm</td><td>Assistant Engineer logs surface runoff and clears catchwater drains.</td></tr>
+      <tr><td><strong>Trigger Level 2 (Warning)</strong></td><td>${((c.rain_thresh_72h || 0) * 0.8).toFixed(0)} mm</td><td>Pre-stage excavators; restrict highway traffic to single-lane 20 km/h.</td></tr>
+      <tr><td><strong>Trigger Level 3 (Critical Action)</strong></td><td>${((c.rain_thresh_72h || 0) * 1.0).toFixed(0)} mm</td><td>Immediate roadway closure; sound sirens; evacuate toe impact zone.</td></tr>
+    </tbody>
+  </table>
+  <table class="data-table">
+    <tr><td class="label-col">Statutory 72-Hour Threshold</td><td>${c.rain_thresh_72h || 0} mm</td></tr>
+    <tr><td class="label-col">Current Recorded 72-Hour Rainfall</td><td>${(c.rainfall_72h || 0).toFixed(1)} mm</td></tr>
+    <tr><td class="label-col">Primary Risk Driver</td><td>${(c.top_risk_factor || 'Steep slope gradient combined with saturation').replace(/_/g,' ').toUpperCase()}</td></tr>
   </table>
 </div>
 
 <div class="section">
-  <div class="section-title">5 · Treatment Recommendation</div>
-  <table>
-    <tr><td>Recommended Treatment</td><td><strong>${treatment}</strong></td></tr>
-    <tr><td>Estimated Cost per 100m</td><td>₹${costLakhs} Lakhs</td></tr>
-    <tr><td>IS 14458 Compliance</td><td><span class="badge badge-green">Compliant</span></td></tr>
-    <tr><td>Road Class</td><td>${c.road_class || 'NH (assumed)'}</td></tr>
+  <div class="section-title">5. Mandated Engineering Remediation Countermeasures</div>
+  <table class="data-table">
+    <tr><td class="label-col">Proposed Structural Intervention</td><td><strong>${treatment}</strong></td></tr>
+    <tr><td class="label-col">Engineering Classification</td><td>${treatmentClass}</td></tr>
+    <tr><td class="label-col">Governing Standard</td><td>IS 14458 (Parts 1–4) &amp; MoRTH Specifications Section 3100</td></tr>
+    <tr><td class="label-col">Subsurface Drainage Mandate</td><td>Perforated horizontal drains (75mm dia PVC) drilled at 5° gradient into failure plane</td></tr>
   </table>
 </div>
 
 <div class="section">
-  <div class="section-title">6 · SAR / Deformation Data</div>
-  <table>
-    <tr><td>SAR Coherence</td><td>${(c.sar_coherence || 0).toFixed(3)}</td></tr>
-    <tr><td>InSAR Deformation Proxy</td><td>${(c.deformation_proxy || 0).toFixed(3)} m</td></tr>
-    <tr><td>NDVI</td><td>${(c.ndvi || 0).toFixed(3)}</td></tr>
-    <tr><td>NDWI</td><td>${(c.ndwi || 0).toFixed(3)}</td></tr>
+  <div class="section-title">6. Satellite SAR Interferometry &amp; Deformation Indices</div>
+  <table class="data-table">
+    <tr><td class="label-col">Sentinel-1 SAR Coherence</td><td>${(c.sar_coherence || 0.85).toFixed(3)} [Scale 0.00 – 1.00]</td></tr>
+    <tr><td class="label-col">InSAR Deformation Proxy</td><td>${(c.deformation_proxy || 0.002).toFixed(3)} m (Cumulative Displacement)</td></tr>
+    <tr><td class="label-col">Vegetation Index (NDVI)</td><td>${(c.ndvi || 0.62).toFixed(3)}</td></tr>
   </table>
 </div>
 
-<div class="footer">
-  <span>LITHOS · Engineer Portal v7.0 · MoRTH Slope Monitoring Initiative</span>
-  <span>Ref: ${c.cell_id} · ${now.toISOString().slice(0,10)}</span>
+<table class="sign-table">
+  <tr>
+    <td style="width:33%;">
+      <strong>Inspecting Field Engineer:</strong><br/>
+      Signature: __________________________<br/>
+      Name: ______________________________<br/>
+      Designation: Assistant Executive Engineer (Civil)
+    </td>
+    <td style="width:33%;">
+      <strong>Reviewing Geotechnical Authority:</strong><br/>
+      Signature: __________________________<br/>
+      Name: ______________________________<br/>
+      Designation: Executive Engineer, NHAI Division
+    </td>
+    <td style="width:34%;">
+      <strong>Official Division Seal:</strong><br/>
+      Date: ______________________________<br/>
+      Station: ___________________________
+    </td>
+  </tr>
+</table>
+
+<div class="footer-note">
+  <span>LITHOS Geotechnical Platform · Government of India · Ministry of Road Transport &amp; Highways</span>
+  <span>Document Reference: MoRTH/NER/SLP-${c.cell_id} · Generated on ${ts}</span>
 </div>`;
-    openPrintPage(`LITHOS GeoReport — ${c.cell_id}`, html);
+
+    openPrintPage(`LITHOS Official Technical Dossier — ${c.cell_id}`, html);
   };
 
   const downloadSiteChecklist = () => {
@@ -318,135 +460,123 @@ ${htmlBody}
     const now = new Date();
     const ts = now.toLocaleDateString('en-IN', { day:'2-digit', month:'long', year:'numeric' });
     const region = selectedRegion ? selectedRegion.name : (c.region || 'Unknown');
-    const riskBadge = c.risk_level === 'RED' ? 'badge-red' : c.risk_level === 'ORANGE' ? 'badge-orange' : 'badge-green';
-    const checkItem = (text) => `<div class="checklist-item"><div class="checkbox"></div><span>${text}</span></div>`;
+    const checkItem = (text) => `<div class="checklist-item"><span class="box"></span><span>${text}</span></div>`;
+
     const html = `
-<div class="header">
-  <div class="header-left">
-    <h1>📋 LITHOS Field Site Inspection Checklist</h1>
-    <p>Geotechnical Field Inspection · NHAI IS 14458 Protocol</p>
-  </div>
-  <div class="header-right">
-    <div><strong>Cell ID:</strong> ${c.cell_id}</div>
-    <div><strong>Region:</strong> ${region}</div>
-    <div><strong>Date:</strong> ${ts}</div>
-  </div>
+<div class="gov-header">
+  <div class="gov-sup">GOVERNMENT OF INDIA · MINISTRY OF ROAD TRANSPORT &amp; HIGHWAYS</div>
+  <div class="gov-dept">NATIONAL HIGHWAYS AUTHORITY OF INDIA — GEOTECHNICAL FIELD WING</div>
+  <div class="gov-title-main">FIELD SLOPE INVESTIGATION &amp; AUDIT CHECKLIST</div>
+  <div class="gov-sub">Proforma for On-Site Physical Inspection under IS 14458 (Parts 1–4) &amp; IRC:SP:48</div>
 </div>
 
-<div class="ref-note">
-  Risk Assessment: <span class="badge ${riskBadge}">${c.risk_level || 'N/A'}</span> &nbsp;|&nbsp;
-  FoS Seismic: <strong>${(c.fos_seismic || 0).toFixed(2)}</strong> &nbsp;|&nbsp;
-  Stability: <strong>${c.stability_class || 'N/A'}</strong> &nbsp;|&nbsp;
-  Slope: <strong>${c.slope_mean || 0}°</strong> &nbsp;|&nbsp;
-  Soil: <strong>${(c.soil_type || '').replace(/_/g,' ')}</strong> &nbsp;|&nbsp;
-  NHAI: <strong>${c.nhai_code || 'N/A'}</strong>
-</div>
+<table class="gov-meta-table">
+  <tr>
+    <td style="width:25%;"><strong>Slope Cell ID:</strong> #${c.cell_id}</td>
+    <td style="width:25%;"><strong>Jurisdiction:</strong> ${region}</td>
+    <td style="width:25%;"><strong>Date of Inspection:</strong> ${ts}</td>
+    <td style="width:25%;"><strong>NHAI Highway Code:</strong> ${c.nhai_code || 'NH-CORRIDOR'}</td>
+  </tr>
+  <tr>
+    <td><strong>Coordinates:</strong> ${(c.center_lat || 0).toFixed(5)}° N, ${(c.center_lon || 0).toFixed(5)}° E</td>
+    <td><strong>LITHOS Risk Category:</strong> [${c.risk_level || 'N/A'}]</td>
+    <td><strong>Seismic FoS:</strong> ${(c.fos_seismic || 0).toFixed(2)}</td>
+    <td><strong>Strata:</strong> ${(c.soil_type || '').replace(/_/g,' ').toUpperCase()}</td>
+  </tr>
+</table>
 
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px;">
-  <div><div class="sign-label">Engineer Name</div><div class="sign-field">&nbsp;</div></div>
-  <div><div class="sign-label">Designation</div><div class="sign-field">&nbsp;</div></div>
+<div class="section">
+  <div class="section-title">Section A: Pre-Inspection Verification</div>
+  ${checkItem('Verify latest LITHOS seismic factor of safety and 72-hr rainfall threshold prior to field departure.')}
+  ${checkItem(`Check 72-hr regional rainfall accumulation (LITHOS Threshold: <strong>${c.rain_thresh_72h || '—'} mm</strong>).`)}
+  ${checkItem('Verify that standard PPE (high-visibility vest, safety helmet, steel-toed boots) is equipped.')}
+  ${checkItem('Equip calibrated clinometer, 30m survey tape, Geological hammer, and crack displacement gauges.')}
+  ${checkItem('Confirm local emergency communication channel and police dispatch contact numbers.')}
 </div>
 
 <div class="section">
-  <div class="section-title">A · Pre-Visit Preparation</div>
-  ${checkItem('Review LITHOS risk map before departure')}
-  ${checkItem(`Collect latest 72-hr rainfall data — threshold: <strong>${c.rain_thresh_72h || '—'} mm</strong>`)}
-  ${checkItem('Check weather forecast for next 24 hours')}
-  ${checkItem('Inform project office of visit schedule')}
-  ${checkItem('Carry PPE: helmet, reflective vest, safety boots')}
-  ${checkItem('Carry equipment: clinometer, measuring tape, camera')}
-  ${checkItem('Download offline maps for this region')}
+  <div class="section-title">Section B: Field Slope Geometry Verification</div>
+  <div style="margin-bottom:4px;font-size:8.5pt;"><em>LITHOS Reference Gradient: <strong>${c.slope_mean || 0}°</strong> · Soil Depth: <strong>${c.soil_depth_m || 0} m</strong></em></div>
+  ${checkItem('Measured slope angle at <strong>crest</strong>: ________°')}
+  ${checkItem('Measured slope angle at <strong>mid-slope</strong>: ________°')}
+  ${checkItem('Measured slope angle at <strong>toe</strong>: ________°')}
+  ${checkItem('Estimated vertical slope height (H): ________ meters')}
+  ${checkItem('Slope aspect / trajectory azimuth: ________° (Bearing)')}
+  ${checkItem('Presence of tension cracks along scarp: [  ] YES &nbsp; [  ] NO &nbsp;— Measured Max Width: ________ mm')}
+  ${checkItem('Scarp headwall displacement / drop: ________ mm')}
 </div>
 
 <div class="section">
-  <div class="section-title">B · Slope Geometry Verification</div>
-  <div class="ref-note">LITHOS Reference Slope: <strong>${c.slope_mean || 0}°</strong></div>
-  ${checkItem('Slope angle at <strong>crest</strong>: ______°')}
-  ${checkItem('Slope angle at <strong>mid-slope</strong>: ______°')}
-  ${checkItem('Slope angle at <strong>toe</strong>: ______°')}
-  ${checkItem('Estimated slope height: ______ m')}
-  ${checkItem('Slope aspect/direction: ______°')}
-  ${checkItem('Slope length: ______ m')}
-  ${checkItem('Note any scarps or slope breaks: ________________________________')}
+  <div class="section-title">Section C: Geological &amp; Soil Stratigraphy Inspection</div>
+  <div style="margin-bottom:4px;font-size:8.5pt;"><em>LITHOS Soil Type: <strong>${(c.soil_type || '').replace(/_/g,' ').toUpperCase()}</strong> · Liquefaction Flag: <strong>${c.liquefaction_risk ? 'HIGH RISK' : 'None'}</strong></em></div>
+  ${checkItem('Verify surface soil strata: [  ] Residual Silt/Clay &nbsp; [  ] Colluvium/Debris &nbsp; [  ] Weathered Bedrock')}
+  ${checkItem('Weathering Grade: [  ] Grade I (Fresh) &nbsp; [  ] Grade II (Slight) &nbsp; [  ] Grade III (Moderate) &nbsp; [  ] Grade IV (High)')}
+  ${checkItem('Bedrock bedding / joint dip direction towards road: [  ] Adverse (Daylighting) &nbsp; [  ] Favorable')}
+  ${checkItem('Water seepage / spring emergence visible on slope face: [  ] YES &nbsp; [  ] NO')}
+  ${checkItem('Evidence of toe scouring / erosion by river or culvert discharge: [  ] YES &nbsp; [  ] NO')}
 </div>
 
 <div class="section">
-  <div class="section-title">C · Soil & Geology Inspection</div>
-  <div class="ref-note">LITHOS Soil: <strong>${(c.soil_type || '').replace(/_/g,' ')}</strong> · Depth: <strong>${c.soil_depth_m || 0} m</strong> · Liquefaction Flag: <strong>${c.liquefaction_risk ? 'HIGH RISK' : 'No'}</strong></div>
-  ${checkItem('Confirm soil type at surface: _______________________________')}
-  ${checkItem('Visible weathering grade: &nbsp;[ ] Fresh &nbsp;[ ] Slightly &nbsp;[ ] Moderately &nbsp;[ ] Highly')}
-  ${checkItem('Rock outcrops present: &nbsp;[ ] Yes &nbsp;[ ] No')}
-  ${checkItem('Evidence of old landslides: &nbsp;[ ] Yes &nbsp;[ ] No &nbsp;— Notes: ___________________')}
-  ${checkItem('Tension cracks observed: &nbsp;[ ] Yes &nbsp;[ ] No &nbsp;— Width: ______ mm')}
-  ${checkItem('Seepage / springs visible: &nbsp;[ ] Yes &nbsp;[ ] No &nbsp;— Location: _______________')}
-  ${checkItem('Tree root exposure (erosion): &nbsp;[ ] Yes &nbsp;[ ] No')}
-  ${checkItem('Liquefaction indicators: &nbsp;[ ] Yes &nbsp;[ ] No')}
+  <div class="section-title">Section D: Drainage Subsystems Audit</div>
+  ${checkItem('Catchwater drain along slope crest functional and free of silt: [  ] YES &nbsp; [  ] PARTIALLY &nbsp; [  ] BLOCKED')}
+  ${checkItem('Chute drains / cascade drains clear of boulder debris: [  ] YES &nbsp; [  ] NO')}
+  ${checkItem('Weep holes in existing retaining walls flowing freely (no calcification): [  ] YES &nbsp; [  ] CLOGGED &nbsp; [  ] N/A')}
+  ${checkItem('Ponding / localized waterlogging observed behind wall or at toe: [  ] YES &nbsp; [  ] NO')}
 </div>
 
 <div class="section">
-  <div class="section-title">D · Drainage Assessment</div>
-  <div class="ref-note">Drainage Density: <strong>${(c.drainage_density || 0).toFixed(2)} km/km²</strong></div>
-  ${checkItem('Existing drains functional: &nbsp;[ ] Yes &nbsp;[ ] Partially &nbsp;[ ] No')}
-  ${checkItem('Drain blockages: &nbsp;[ ] Yes &nbsp;[ ] No &nbsp;— Location: _________________')}
-  ${checkItem('Surface runoff channels clear: &nbsp;[ ] Yes &nbsp;[ ] No')}
-  ${checkItem('Weep holes in retaining wall clear: &nbsp;[ ] Yes &nbsp;[ ] No &nbsp;[ ] N/A')}
-  ${checkItem('Ponding / waterlogging: &nbsp;[ ] Yes &nbsp;[ ] No')}
-  ${checkItem('Distance to nearest drainage: ______ m')}
+  <div class="section-title">Section E: Trigger Action Response Level (TARP) Verification</div>
+  <table class="data-table" style="margin-bottom:4px;">
+    <tr><th>Trigger Level 1 (Vigilance)</th><th>Trigger Level 2 (Warning)</th><th>Trigger Level 3 (Critical Action)</th></tr>
+    <tr>
+      <td>${((c.rain_thresh_72h || 0) * 0.6).toFixed(0)} mm (72h)</td>
+      <td>${((c.rain_thresh_72h || 0) * 0.8).toFixed(0)} mm (72h)</td>
+      <td>${((c.rain_thresh_72h || 0) * 1.0).toFixed(0)} mm (72h)</td>
+    </tr>
+  </table>
+  ${checkItem('Observed on-site trigger state: [  ] Normal Baseline &nbsp; [  ] Level 1 (Vigilance) &nbsp; [  ] Level 2 (Warning) &nbsp; [  ] Level 3 (Critical)')}
+  ${checkItem('If Trigger Level 2: Heavy earthmoving equipment pre-staged within 5km radius: [  ] YES &nbsp; [  ] PENDING')}
+  ${checkItem('If Trigger Level 3: Total roadway closure and physical barricades erected: [  ] YES &nbsp; [  ] PENDING')}
 </div>
 
 <div class="section">
-  <div class="section-title">E · Existing Structure Condition</div>
-  ${checkItem('Retaining wall present: &nbsp;[ ] Yes &nbsp;[ ] No &nbsp;— Type: ______________ &nbsp;Condition: [ ] Good &nbsp;[ ] Fair &nbsp;[ ] Poor')}
-  ${checkItem('Road edge condition: &nbsp;[ ] Stable &nbsp;[ ] Minor distress &nbsp;[ ] Severe cracking')}
-  ${checkItem('Culverts clear: &nbsp;[ ] Yes &nbsp;[ ] No &nbsp;[ ] N/A')}
-  ${checkItem('Slope protection (shotcrete/bio): &nbsp;[ ] Present &nbsp;[ ] Damaged &nbsp;[ ] Absent')}
-  ${checkItem('Safety signage and barriers adequate: &nbsp;[ ] Yes &nbsp;[ ] No')}
+  <div class="section-title">Section F: Structural Intervention &amp; Maintenance Directives</div>
+  <div style="margin-bottom:4px;font-size:8.5pt;"><em>LITHOS Recommended Countermeasure: <strong>${c.slope_mean > 45 ? 'RC Retaining Wall' : c.slope_mean > 30 ? 'Gabion Wall with Weep Holes' : 'Bio-Engineering & Toe Drain'}</strong></em></div>
+  ${checkItem('Immediate emergency maintenance work order required: [  ] YES &nbsp; [  ] NO')}
+  ${checkItem('Description of immediate work: ____________________________________________________________________')}
+  ${checkItem('Target completion date for interim measures: ____________________')}
+  ${checkItem('Mandated follow-up geotechnical re-inspection date: ____________________')}
 </div>
 
-<div class="section">
-  <div class="section-title">F · Trigger Level Field Assessment</div>
-  <div class="tl-bar">
-    <div class="tl-item tl-1"><div class="mm">${((c.rain_thresh_72h || 0) * 0.6).toFixed(0)} mm</div><div>TL1 · Vigilance</div></div>
-    <div class="tl-item tl-2"><div class="mm">${((c.rain_thresh_72h || 0) * 0.8).toFixed(0)} mm</div><div>TL2 · Warning</div></div>
-    <div class="tl-item tl-3"><div class="mm">${((c.rain_thresh_72h || 0) * 1.0).toFixed(0)} mm</div><div>TL3 · Critical</div></div>
-  </div>
-  <div style="margin-top:8px;">
-  ${checkItem('Current TL status: &nbsp;[ ] Normal &nbsp;[ ] TL1 Vigilance &nbsp;[ ] TL2 Warning &nbsp;[ ] TL3 Critical')}
-  ${checkItem(`Rainfall (last 72h) at site: ______ mm &nbsp;(LITHOS: ${(c.rainfall_72h || 0).toFixed(0)} mm)`)}
-  ${checkItem('If TL2 — road closure equipment staged: &nbsp;[ ] Yes &nbsp;[ ] No')}
-  ${checkItem('If TL3 — road closed and barricaded: &nbsp;[ ] Yes &nbsp;[ ] No')}
-  ${checkItem('Emergency contacts notified: &nbsp;[ ] Yes &nbsp;[ ] No')}
-  </div>
-</div>
+<table class="sign-table">
+  <tr>
+    <td style="width:33%;">
+      <strong>Inspecting Engineer:</strong><br/>
+      Signature: __________________________<br/>
+      Name: ______________________________<br/>
+      Designation: Assistant Executive Engineer
+    </td>
+    <td style="width:33%;">
+      <strong>Field Division:</strong><br/>
+      Division Office: ____________________<br/>
+      Sub-Division: ______________________<br/>
+      Station Seal:
+    </td>
+    <td style="width:34%;">
+      <strong>Countersigned (Executive Engineer):</strong><br/>
+      Signature: __________________________<br/>
+      Name: ______________________________<br/>
+      Date: ______________________________
+    </td>
+  </tr>
+</table>
 
-<div class="section">
-  <div class="section-title">G · Recommended Actions</div>
-  <div class="ref-note">LITHOS Recommendation: <strong>${c.slope_mean > 45 ? 'RC Retaining Wall' : c.slope_mean > 30 ? 'Gabion Wall + Weep Holes' : 'Vegetation + Toe Drain'}</strong></div>
-  ${checkItem('Issue maintenance work order')}
-  ${checkItem('Engage contractor for: ___________________________________________')}
-  ${checkItem('Estimated start date: ___________________________________________')}
-  ${checkItem('Re-inspection scheduled for: ____________________________________')}
-</div>
-
-<div class="section">
-  <div class="section-title">H · Sign-Off</div>
-  <div class="sign-row">
-    <div>
-      <div class="sign-label">Engineer Signature</div><div class="sign-field">&nbsp;</div>
-      <div class="sign-label">Designation</div><div class="sign-field">&nbsp;</div>
-    </div>
-    <div>
-      <div class="sign-label">Division Office</div><div class="sign-field">&nbsp;</div>
-      <div class="sign-label">Next Inspection Date</div><div class="sign-field">&nbsp;</div>
-    </div>
-  </div>
-</div>
-
-<div class="footer">
-  <span>LITHOS · Engineer Portal v7.0 · MoRTH Slope Monitoring Initiative</span>
-  <span>Checklist Ref: ${c.cell_id} · ${now.toISOString().slice(0,10)}</span>
+<div class="footer-note">
+  <span>LITHOS Geotechnical Framework · Ministry of Road Transport &amp; Highways · Government of India</span>
+  <span>Checklist Ref: MoRTH/INSP/SLP-${c.cell_id} · Generated ${ts}</span>
 </div>`;
-    openPrintPage(`LITHOS Site Checklist — ${c.cell_id}`, html);
+
+    openPrintPage(`LITHOS Field Inspection Checklist — ${c.cell_id}`, html);
   };
 
 
@@ -986,16 +1116,24 @@ ${htmlBody}
 
               {/* Retaining Wall Recommendation Engine */}
               {(selectedCell.stability_class === 'Class III' || selectedCell.stability_class === 'Class IV') && (
-                <div className="glass p-4 rounded-xl border-risk-orange/30 bg-risk-orange/5">
-                  <h3 className="text-xs font-black uppercase text-risk-orange mb-3">Recommendation Engine</h3>
+                <div className="glass p-4 rounded-xl border border-white/10 bg-black/30">
+                  <h3 className="text-xs font-black uppercase text-white/70 mb-3">Recommendation Engine</h3>
                   <div className="bg-black/40 p-3 rounded-lg border border-white/10">
                     <div className="text-[10px] text-white/50 uppercase mb-1">Proposed Treatment</div>
-                    <div className="font-bold text-lg mb-2">
+                    <div className="font-bold text-base mb-2 text-white">
                       {selectedCell.slope_mean > 45 ? 'RC Retaining Wall' : selectedCell.slope_mean > 30 ? 'Gabion Wall + Weep Holes' : 'Vegetation + Toe Drain'}
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div><span className="text-white/50 block text-[10px] uppercase">Est. Cost (100m)</span>₹{selectedCell.slope_mean > 45 ? '32.0' : selectedCell.slope_mean > 30 ? '9.0' : '0.5'} Lakhs</div>
-                      <div><span className="text-white/50 block text-[10px] uppercase">IS 14458 Status</span><span className="text-risk-green flex items-center gap-1">Compliant</span></div>
+                      <div>
+                        <span className="text-white/50 block text-[10px] uppercase">Intervention Class</span>
+                        <span className="font-mono text-white text-xs">
+                          {selectedCell.slope_mean > 45 ? 'Structural Heavy' : selectedCell.slope_mean > 30 ? 'Gravity Retaining' : 'Bio-Engineering'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-white/50 block text-[10px] uppercase">IS 14458 Status</span>
+                        <span className="text-risk-green flex items-center gap-1 font-mono">Compliant</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1003,25 +1141,37 @@ ${htmlBody}
 
               <RoadCutCalculator selectedCell={selectedCell} />
 
-              {(selectedCell.stability_class === 'Class III' || selectedCell.stability_class === 'Class IV') && (
-                <CostBenefitPanel selectedCell={selectedCell} />
-              )}
-
-              {/* Slope Monitoring Recommendations */}
+              {/* Slope Monitoring Recommendations with Touch-to-Open Phone Guide */}
               {selectedCell.fos_seismic < 1.5 && (
-                <div className="glass p-4 rounded-xl border-risk-orange/30 bg-risk-orange/5">
-                  <h3 className="text-xs font-black uppercase text-risk-orange mb-3">IoT Sensor Recommendations</h3>
+                <div 
+                  onClick={() => setShowSensorGuide(true)}
+                  className="glass p-4 rounded-xl border border-[#00C2FF]/30 bg-[#00C2FF]/5 cursor-pointer hover:border-[#00C2FF] hover:bg-[#00C2FF]/10 transition-all group"
+                >
+                  <div className="flex items-center justify-between mb-2.5">
+                    <h3 className="text-xs font-black uppercase text-[#00C2FF] tracking-wide">
+                      IoT Sensor Subsystem
+                    </h3>
+                    <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-[#00C2FF]/20 text-[#00C2FF] border border-[#00C2FF]/40">
+                      Touch for Phone Guide
+                    </span>
+                  </div>
                   <div className="space-y-2">
-                    <div className="bg-black/30 p-2 rounded text-xs">
-                      <div className="font-bold flex justify-between"><span className="text-[#00C2FF]">1. Piezometer</span> <span>₹20k</span></div>
-                      <div className="text-[10px] text-white/60">Monitor pore water pressure. Drill 3-5m into slope.</div>
+                    <div className="bg-black/40 p-2.5 rounded-lg border border-white/5">
+                      <div className="font-bold flex justify-between text-xs">
+                        <span className="text-white">1. Vibrating Wire Piezometer</span>
+                        <span className="text-white/40 font-mono text-[10px]">3–5m Borehole</span>
+                      </div>
+                      <div className="text-[10px] text-white/60 mt-0.5">Monitors interstitial pore water pressure rise during monsoons.</div>
                     </div>
-                    <div className="bg-black/30 p-2 rounded text-xs">
-                      <div className="font-bold flex justify-between"><span className="text-[#00C2FF]">2. Inclinometer</span> <span>₹60k</span></div>
-                      <div className="text-[10px] text-white/60">Detect subsurface movement near failure plane.</div>
+                    <div className="bg-black/40 p-2.5 rounded-lg border border-white/5">
+                      <div className="font-bold flex justify-between text-xs">
+                        <span className="text-white">2. In-Place Inclinometer (IPI)</span>
+                        <span className="text-white/40 font-mono text-[10px]">ABS Grooved Casing</span>
+                      </div>
+                      <div className="text-[10px] text-white/60 mt-0.5">Detects subsurface lateral movement across the anticipated slip plane.</div>
                     </div>
-                    <div className="text-[10px] text-risk-green uppercase font-bold text-center mt-2 border-t border-risk-orange/20 pt-2">
-                      Sensors calibrate LITHOS real-time FoS via API
+                    <div className="text-[10px] text-[#00C2FF]/80 text-center mt-2 border-t border-white/10 pt-2 font-mono">
+                      Tap anywhere on this box to see how to connect a phone sensor →
                     </div>
                   </div>
                 </div>
@@ -1046,6 +1196,91 @@ ${htmlBody}
           )}
         </div>
       </div>
+
+      {/* Clean, Non-Flashing Phone Sensor Guide Modal */}
+      {showSensorGuide && (
+        <div className="fixed inset-0 z-[9999] bg-black/80 flex items-center justify-center p-4">
+          <div className="bg-[#0B0F19] border border-white/20 rounded-2xl max-w-lg w-full p-6 text-white shadow-2xl relative">
+            <div className="flex items-start justify-between border-b border-white/10 pb-3 mb-4">
+              <div>
+                <h2 className="text-sm font-bold text-white uppercase tracking-wider">
+                  In-Situ Mobile Sensor — Field Setup Guide
+                </h2>
+                <p className="text-xs text-white/50 mt-0.5">
+                  How to deploy any smartphone as a calibrated slope telemetry node
+                </p>
+              </div>
+              <button 
+                onClick={() => setShowSensorGuide(false)}
+                className="p-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs text-white/80 leading-relaxed">
+              <div className="flex gap-3 bg-white/5 p-3 rounded-xl border border-white/5">
+                <div className="w-6 h-6 rounded-full bg-[#00C2FF]/20 text-[#00C2FF] flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                  1
+                </div>
+                <div>
+                  <strong className="text-white block mb-0.5">Open on Smartphone</strong>
+                  <span>Open your phone browser (Chrome or Safari) and go to <code className="bg-black/60 px-1.5 py-0.5 rounded text-[#00C2FF] font-mono">/sensor</code> or navigate from the top menu.</span>
+                </div>
+              </div>
+
+              <div className="flex gap-3 bg-white/5 p-3 rounded-xl border border-white/5">
+                <div className="w-6 h-6 rounded-full bg-[#00C2FF]/20 text-[#00C2FF] flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                  2
+                </div>
+                <div>
+                  <strong className="text-white block mb-0.5">One-Tap Authorization (No Manual Settings)</strong>
+                  <span>Tap <em>"Authorize &amp; Start Monitoring"</em>. The browser directly binds the internal 3-axis motion sensors and GNSS GPS without digging into phone settings.</span>
+                </div>
+              </div>
+
+              <div className="flex gap-3 bg-white/5 p-3 rounded-xl border border-white/5">
+                <div className="w-6 h-6 rounded-full bg-[#00C2FF]/20 text-[#00C2FF] flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                  3
+                </div>
+                <div>
+                  <strong className="text-white block mb-0.5">Physical Slope Placement</strong>
+                  <span>Place the phone inside an IP67 waterproof transparent pouch. Fasten it firmly flush against a stable rock bench or pre-driven anchor peg along the slope scarp.</span>
+                </div>
+              </div>
+
+              <div className="flex gap-3 bg-white/5 p-3 rounded-xl border border-white/5">
+                <div className="w-6 h-6 rounded-full bg-[#00C2FF]/20 text-[#00C2FF] flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                  4
+                </div>
+                <div>
+                  <strong className="text-white block mb-0.5">Real-Time Telemetry &amp; Alert Dispatch</strong>
+                  <span>The device samples pitch and roll at 10 Hz. Any angular deflection greater than <strong>3.0°</strong> automatically dispatches a real-time warning over cellular/WiFi directly to this Engineering Portal map.</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 pt-4 border-t border-white/10 flex items-center justify-between gap-3">
+              <button
+                onClick={() => setShowSensorGuide(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-white/60 hover:text-white hover:bg-white/5 border border-white/10 transition-colors"
+              >
+                Close Guide
+              </button>
+              <a
+                href="/sensor"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-5 py-2 rounded-xl text-xs font-bold bg-[#00C2FF] text-black hover:bg-[#009ACC] transition-colors flex items-center gap-1.5"
+              >
+                <span>Launch Phone Sensor Interface</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

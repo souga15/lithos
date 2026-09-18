@@ -20,7 +20,8 @@ import {
   FileSpreadsheet,
   Activity,
   CheckCircle2,
-  ExternalLink
+  ExternalLink,
+  X
 } from 'lucide-react';
 import API_BASE_URL from '../../apiConfig';
 
@@ -34,6 +35,7 @@ const HardwareHub = () => {
   const [manualSuccess, setManualSuccess] = useState(false);
   const [showManualInput, setShowManualInput] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showPhoneGuide, setShowPhoneGuide] = useState(false);
 
   // WebSocket — receive alerts from phone sensor in real time
   useEffect(() => {
@@ -265,7 +267,7 @@ LITHOS Geotechnical Engineering Framework | Ministry of Road Transport & Highway
                     <div className="text-[9px] text-white/40 font-mono">Uplink: WebSocket Port 8000</div>
                   </div>
                 </div>
-                <div className={`w-2 h-2 rounded-full ${liveAlerts.length > 0 ? 'bg-risk-red animate-ping' : 'bg-risk-green'}`} />
+                <div className={`w-2 h-2 rounded-full ${liveAlerts.length > 0 ? 'bg-risk-red' : 'bg-risk-green'}`} />
               </div>
 
               {liveAlerts.length === 0 ? (
@@ -277,7 +279,7 @@ LITHOS Geotechnical Engineering Framework | Ministry of Road Transport & Highway
                   {liveAlerts.slice(0, 4).map(a => (
                     <div key={a.id} className="flex justify-between items-center bg-black/40 px-3 py-2 rounded-lg border border-risk-red/20 font-mono text-[10px]">
                       <div className="flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-risk-red animate-pulse" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-risk-red" />
                         <span className="font-bold text-risk-red">{a.sensor_id}</span>
                         <span className="text-white/60">Tilt: {Number(a.value).toFixed(1)}°</span>
                       </div>
@@ -297,35 +299,46 @@ LITHOS Geotechnical Engineering Framework | Ministry of Road Transport & Highway
               )}
             </div>
 
-            {/* Quick Smartphone Sensor Launcher */}
-            <div className="glass p-4 rounded-xl border border-white/10 bg-white/5">
-              <div className="flex items-center justify-between mb-2">
+            {/* Quick Smartphone Sensor Launcher & Guide */}
+            <div className="glass p-4 rounded-xl border border-white/10 bg-white/5 space-y-3">
+              <div 
+                onClick={() => setShowPhoneGuide(true)}
+                className="flex items-center justify-between cursor-pointer hover:opacity-90 transition-opacity"
+              >
                 <div className="flex items-center gap-2">
                   <div className="p-1.5 rounded bg-cyan-400/10 text-cyan-400">
                     <Activity className="w-4 h-4" />
                   </div>
                   <div>
                     <h4 className="font-black text-xs uppercase tracking-wide text-white">In-Situ Mobile Sensor</h4>
-                    <p className="text-[9px] text-white/50">Turn any mobile phone into a calibrated tiltmeter</p>
+                    <p className="text-[9px] text-white/50">Turn any smartphone into a calibrated tiltmeter</p>
                   </div>
                 </div>
-                <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-risk-green/20 text-risk-green font-bold">
-                  Zero Hardware Cost
+                <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-[#00C2FF]/10 text-[#00C2FF] border border-[#00C2FF]/30">
+                  Touch for Guide
                 </span>
               </div>
-              <p className="text-[11px] text-white/70 mb-3 leading-relaxed">
+              <p className="text-[11px] text-white/70 leading-relaxed">
                 Uses device 3-axis accelerometer and GNSS to stream slope failure warnings. Automatically prompts for browser permissions without requiring manual phone settings modification.
               </p>
-              <a
-                href="/sensor"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full py-2.5 bg-[#00C2FF] hover:bg-[#00A3D9] text-black font-black uppercase tracking-wider rounded-lg text-[11px] text-center flex items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(0,194,255,0.3)]"
-              >
-                <Radio className="w-3.5 h-3.5" />
-                <span>Launch Mobile Sensor Interface</span>
-                <ExternalLink className="w-3 h-3 ml-1 opacity-70" />
-              </a>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setShowPhoneGuide(true)}
+                  className="py-2.5 bg-white/10 hover:bg-white/20 text-white font-bold uppercase tracking-wider rounded-lg text-[10px] text-center transition-all border border-white/10"
+                >
+                  View Setup Guide
+                </button>
+                <a
+                  href="/sensor"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="py-2.5 bg-[#00C2FF] hover:bg-[#00A3D9] text-black font-black uppercase tracking-wider rounded-lg text-[10px] text-center flex items-center justify-center gap-1.5 transition-all shadow-[0_0_15px_rgba(0,194,255,0.25)]"
+                >
+                  <Radio className="w-3.5 h-3.5" />
+                  <span>Launch Interface</span>
+                  <ExternalLink className="w-3 h-3 opacity-70" />
+                </a>
+              </div>
             </div>
 
             {/* Manual Sensor Injection Panel */}
@@ -676,6 +689,90 @@ LITHOS Geotechnical Engineering Framework | Ministry of Road Transport & Highway
                   <span className="text-risk-red font-bold">{Number(a.value).toFixed(2)}°</span>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Clean, Non-Flashing Phone Sensor Guide Modal */}
+      {showPhoneGuide && (
+        <div className="fixed inset-0 z-[9999] bg-black/80 flex items-center justify-center p-4">
+          <div className="bg-[#0B0F19] border border-white/20 rounded-2xl max-w-lg w-full p-6 text-white shadow-2xl relative font-sans">
+            <div className="flex items-start justify-between border-b border-white/10 pb-3 mb-4">
+              <div>
+                <h2 className="text-sm font-bold text-white uppercase tracking-wider">
+                  Smartphone Slope Sensor — Setup Guide
+                </h2>
+                <p className="text-xs text-white/50 mt-0.5">
+                  Deploy any smartphone as an in-situ geotechnical telemetry node
+                </p>
+              </div>
+              <button 
+                onClick={() => setShowPhoneGuide(false)}
+                className="p-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs text-white/80 leading-relaxed">
+              <div className="flex gap-3 bg-white/5 p-3 rounded-xl border border-white/5">
+                <div className="w-6 h-6 rounded-full bg-[#00C2FF]/20 text-[#00C2FF] flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                  1
+                </div>
+                <div>
+                  <strong className="text-white block mb-0.5">Open Page on Smartphone</strong>
+                  <span>On your phone's browser (Safari or Chrome), open <code className="bg-black/60 px-1.5 py-0.5 rounded text-[#00C2FF] font-mono">/sensor</code>.</span>
+                </div>
+              </div>
+
+              <div className="flex gap-3 bg-white/5 p-3 rounded-xl border border-white/5">
+                <div className="w-6 h-6 rounded-full bg-[#00C2FF]/20 text-[#00C2FF] flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                  2
+                </div>
+                <div>
+                  <strong className="text-white block mb-0.5">1-Tap Hardware Authorization</strong>
+                  <span>Tap <em>"Authorize &amp; Start Monitoring"</em>. The browser automatically requests motion &amp; GNSS access without needing manual changes in phone settings.</span>
+                </div>
+              </div>
+
+              <div className="flex gap-3 bg-white/5 p-3 rounded-xl border border-white/5">
+                <div className="w-6 h-6 rounded-full bg-[#00C2FF]/20 text-[#00C2FF] flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                  3
+                </div>
+                <div>
+                  <strong className="text-white block mb-0.5">Anchor to Field Location</strong>
+                  <span>Place the phone inside an IP67 waterproof transparent pouch. Fasten it firmly flush against a rock bench or driven peg at the failure scarp.</span>
+                </div>
+              </div>
+
+              <div className="flex gap-3 bg-white/5 p-3 rounded-xl border border-white/5">
+                <div className="w-6 h-6 rounded-full bg-[#00C2FF]/20 text-[#00C2FF] flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+                  4
+                </div>
+                <div>
+                  <strong className="text-white block mb-0.5">Real-Time Uplink to Engineering Portal</strong>
+                  <span>The device monitors pitch &amp; roll. Any displacement &gt; <strong>3.0°</strong> immediately transmits a WebSocket alert to this portal and pulses the coordinate on the GIS map.</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 pt-4 border-t border-white/10 flex items-center justify-between gap-3">
+              <button
+                onClick={() => setShowPhoneGuide(false)}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-white/60 hover:text-white hover:bg-white/5 border border-white/10 transition-colors"
+              >
+                Close Guide
+              </button>
+              <a
+                href="/sensor"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-5 py-2 rounded-xl text-xs font-bold bg-[#00C2FF] text-black hover:bg-[#009ACC] transition-colors flex items-center gap-1.5"
+              >
+                <span>Launch Phone Sensor Interface</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
             </div>
           </div>
         </div>
