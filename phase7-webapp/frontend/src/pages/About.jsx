@@ -103,7 +103,7 @@ const About = () => {
             >
               <div>
                 <p className="label-micro mb-1">Lead Architect &amp; Researcher</p>
-                <p className="text-lg font-semibold text-white" style={{ letterSpacing: '-0.01em' }}>Sougata M.</p>
+                <p className="text-lg font-semibold text-white" style={{ letterSpacing: '-0.01em' }}>Sougata Karmakar</p>
               </div>
               <div className="h-px w-8" style={{ background: 'rgba(255,255,255,0.08)' }} />
               <div className="space-y-3">

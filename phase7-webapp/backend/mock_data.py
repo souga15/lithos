@@ -48,6 +48,22 @@ except Exception as _e:
     _SLOPE_UNITS_GDF = None
     print(f"[Phase 9] WARNING: Could not load GPKG ({_e}). Falling back to grid.")
 
+# Load official state boundary polygons for precision boundary conformance
+_BOUNDARIES_PATH = os.path.join(os.path.dirname(__file__), "ne_state_boundaries.json")
+_STATE_BOUNDARY_POLYS = {}
+if os.path.exists(_BOUNDARIES_PATH):
+    try:
+        with open(_BOUNDARIES_PATH, "r", encoding="utf-8") as _bf:
+            _bdata = json.load(_bf)
+        from shapely.geometry import Polygon as _ShapelyPolygon
+        for _bk, _bcoords in _bdata.items():
+            if len(_bcoords) >= 3:
+                # 0.015 deg buffer (~1.5 km) preserves edge ridgelines while stopping cross-border spill
+                _STATE_BOUNDARY_POLYS[_bk] = _ShapelyPolygon(_bcoords).buffer(0.015)
+        print(f"[Phase 9] Loaded {len(_STATE_BOUNDARY_POLYS)} state boundary masks for spatial alignment")
+    except Exception as _be:
+        print(f"[Phase 9] Note: boundary masks not loaded ({_be})")
+
 # Minimum polygon count to consider GPKG data usable for a region
 # All DEM regions have 13-1835 units so threshold of 10 is safe
 _MIN_GPKG_UNITS = 10
@@ -643,6 +659,15 @@ def generate_cells(region_key: str) -> List[Dict]:
 
     elif use_gpkg:
         # ── PATH A: Real Phase 9 slope-unit polygons ──────────────────────────
+        # Spatially filter units to state boundary if mask exists (e.g. cleans up Sikkim rectangle and Arunachal)
+        if region_key in _STATE_BOUNDARY_POLYS:
+            _b_poly = _STATE_BOUNDARY_POLYS[region_key]
+            from shapely.geometry import Point as _ShapelyPoint
+            _mask = [_b_poly.contains(_ShapelyPoint(lon, lat)) for lon, lat in zip(df_region["center_lon"], df_region["center_lat"])]
+            _filtered_df = df_region[_mask]
+            if len(_filtered_df) >= _MIN_GPKG_UNITS:
+                df_region = _filtered_df
+
         print(f"[Phase 9] {region_key}: using {len(df_region)} real slope units from GPKG")
 
         for row in df_region.itertuples(index=False):

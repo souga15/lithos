@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
 import axios from 'axios';
 import API_BASE_URL from '../apiConfig';
-import { MapContainer, TileLayer, GeoJSON, useMap, Marker, Popup, Circle } from 'react-leaflet';
+import { MapContainer, TileLayer, GeoJSON, useMap, Marker, Popup, Circle, Polyline } from 'react-leaflet';
+import { NE_STATE_BOUNDARIES, STATE_BORDER_COLORS } from '../constants/NE_STATE_BOUNDARIES';
 import L from 'leaflet';
 import { HardHat, FileText, Download, Target, Activity, Search, Map as MapIcon } from 'lucide-react';
 
@@ -449,46 +450,89 @@ ${htmlBody}
 
 
   const getOverlayStyle = useCallback((feature) => {
-    const props = feature.properties;
-    let color = '#333';
-    let opacity = 0.25;
+    const props = feature.properties || {};
+    let color = '#3B82F6';
+    let opacity = 0.62;
 
     if (overlayMode === 'stability_class') {
       const cls = props.stability_class;
-      color = cls === 'Class I' ? '#30D158' : cls === 'Class II' ? '#FFD60A' : cls === 'Class III' ? '#FF9500' : '#FF3B30';
+      color = cls === 'Class I' ? '#10B981' : 
+              cls === 'Class II' ? '#06B6D4' : 
+              cls === 'Class III' ? '#F59E0B' : 
+              '#EF4444';
     } else if (overlayMode === 'fos_seismic') {
-      const fos = props.fos_seismic;
-      color = fos >= 2.0 ? '#30D158' : fos >= 1.5 ? '#FFD60A' : fos >= 1.0 ? '#FF9500' : '#FF3B30';
+      const fos = props.fos_seismic != null ? props.fos_seismic : 1.0;
+      color = fos >= 1.5 ? '#10B981' : 
+              fos >= 1.25 ? '#06B6D4' : 
+              fos >= 1.0 ? '#F59E0B' : 
+              fos >= 0.85 ? '#F97316' : 
+              '#EF4444';
     } else if (overlayMode === 'soil_type') {
       const type = (props.soil_type || '').toLowerCase();
-      if (type.includes('laterite')) color = '#FF4500'; 
-      else if (type.includes('alluvial') || type.includes('loam')) color = '#DAA520'; 
-      else if (type.includes('granite') || type.includes('gneiss') || type.includes('charnockite')) color = '#808080'; 
-      else if (type.includes('colluvium') || type.includes('moraine')) color = '#8B4513'; 
-      else if (type.includes('sandstone') || type.includes('flysch')) color = '#CD853F'; 
-      else if (type.includes('phyllite') || type.includes('schist')) color = '#8A2BE2'; 
-      else color = '#A9A9A9'; 
-      opacity = 0.3; 
+      if (type.includes('moraine') || type.includes('colluvium') || type.includes('glacial')) {
+        color = '#D946EF'; // Fuchsia for Alpine Moraine
+      } else if (type.includes('regolith') || type.includes('crystalline')) {
+        color = '#06B6D4'; // Electric Cyan for Himalayan Regolith
+      } else if (type.includes('gneiss') || type.includes('granite') || type.includes('charnockite') || type.includes('bomdila')) {
+        color = '#3B82F6'; // Royal Cobalt for Gneiss
+      } else if (type.includes('sandstone') || type.includes('siwalik') || type.includes('flysch')) {
+        color = '#F59E0B'; // Sandstone Amber
+      } else if (type.includes('alluvial') || type.includes('loam')) {
+        color = '#10B981'; // Emerald Green
+      } else if (type.includes('phyllite') || type.includes('schist')) {
+        color = '#8B5CF6'; // Purple Schist
+      } else if (type.includes('laterite')) {
+        color = '#EC4899'; // Bright Terracotta
+      } else {
+        color = '#38BDF8'; // Sky Blue
+      }
+      opacity = 0.65;
     } else if (overlayMode === 'drainage') {
-      const d = props.drainage_density;
-      color = d > 4 ? '#0000FF' : d > 2 ? '#00BFFF' : '#87CEEB';
-      opacity = 0.2;
+      const d = props.drainage_density || 0;
+      color = d > 4 ? '#2563EB' : 
+              d > 2.5 ? '#06B6D4' : 
+              d > 1.2 ? '#38BDF8' : 
+              '#94A3B8';
+      opacity = d > 2.5 ? 0.70 : 0.45;
     }
 
     if (selectedCell && selectedCell.cell_id === props.cell_id) {
-      return { fillColor: '#00C2FF', fillOpacity: 0.5, weight: 2, color: '#FFF' };
+      return { 
+        fillColor: '#00F0FF', 
+        fillOpacity: 0.92, 
+        weight: 2.5, 
+        color: '#FFFFFF' 
+      };
     }
 
-    return { fillColor: color, fillOpacity: opacity, weight: 1, color: 'rgba(255,255,255,0.1)' };
+    return { 
+      fillColor: color, 
+      fillOpacity: opacity, 
+      weight: 0.25, 
+      color: 'rgba(255,255,255,0.15)' 
+    };
   }, [overlayMode, selectedCell]);
 
   const onEachFeature = useCallback((feature, layer) => {
+    const props = feature.properties || {};
+
+    layer.bindTooltip(
+      `<div style="font-family: monospace; font-size: 11px; line-height: 1.4;">
+        <strong style="color: #00F0FF;">${props.cell_id || 'Slope Unit'}</strong><br/>
+        <span>FoS (Seis): <strong>${props.fos_seismic != null ? props.fos_seismic : 'N/A'}</strong></span><br/>
+        <span>Class: <strong style="color: ${props.stability_class === 'Class IV' ? '#EF4444' : '#F59E0B'}">${props.stability_class || 'N/A'}</strong></span><br/>
+        <span>Geology: ${props.soil_type || 'Unknown'}</span><br/>
+        <span>Slope: ${props.slope_mean ? props.slope_mean.toFixed(1) + '°' : 'N/A'}</span>
+      </div>`,
+      { sticky: true, className: 'lithos-tooltip' }
+    );
+
     layer.on({
       click: () => {
-        let props = { ...feature.properties };
-        if (!props.soil_type) {
-          props = {
-            ...props,
+        let p = { ...props };
+        if (!p.soil_type) {
+          p = {
+            ...p,
             soil_type: 'data_syncing',
             liquefaction_risk: false,
             cohesion_kpa: 0,
@@ -507,20 +551,37 @@ ${htmlBody}
             saturation_ratio: 0.0,
           };
         }
-        setSelectedCell(props);
+        setSelectedCell(p);
       }
     });
   }, []);
+
+  // Performance-optimized GeoJSON: only decimate if > 15000 units (i.e. Arunachal ~21k)
+  // Render 100% of slope units without decimation
+  const displayRiskGrid = useMemo(() => {
+    return riskGrid;
+  }, [riskGrid]);
 
   const MapUpdater = () => {
     const map = useMap();
     useEffect(() => {
       if (searchResult) {
         map.flyTo([searchResult.lat, searchResult.lon], 14, { animate: true, duration: 1.5 });
-      } else if (selectedRegion && selectedRegion.center) {
-        map.setView(selectedRegion.center, 11);
+      } else if (selectedRegion) {
+        if (selectedRegion.bbox && selectedRegion.bbox.length === 4) {
+          const [minX, minY, maxX, maxY] = selectedRegion.bbox;
+          map.fitBounds([[minY, minX], [maxY, maxX]], {
+            padding: [24, 24],
+            maxZoom: selectedRegion.key === 'arunachal_w' ? 8 : (selectedRegion.key === 'sikkim' ? 10 : 11),
+            animate: true,
+            duration: 1.0
+          });
+        } else if (selectedRegion.center) {
+          const targetZoom = selectedRegion.key === 'arunachal_w' ? 8 : (selectedRegion.key === 'sikkim' ? 10 : 11);
+          map.flyTo(selectedRegion.center, targetZoom, { animate: true, duration: 1.0 });
+        }
       }
-    }, [map, searchResult]); // intentionally omitted selectedRegion from dep array to avoid constant zooming
+    }, [map, selectedRegion?.key, searchResult]);
     return null;
   };
 
@@ -580,6 +641,55 @@ ${htmlBody}
             </form>
           </div>
 
+          {/* Floating Map Legend */}
+          {mapStyle !== '3d' && (
+            <div className="absolute bottom-6 left-4 z-[1000] glass px-3 py-2.5 rounded-xl text-[10px] flex flex-col gap-1.5 backdrop-blur-md border border-white/10 shadow-lg pointer-events-auto max-w-[240px]">
+              <div className="text-[9px] uppercase font-black text-white/50 tracking-wider">
+                {overlayMode === 'fos_seismic' && 'FoS (Seismic) Scale'}
+                {overlayMode === 'stability_class' && 'Stability Classification'}
+                {overlayMode === 'soil_type' && 'Regional Lithology'}
+                {overlayMode === 'drainage' && 'Drainage Density'}
+              </div>
+              
+              {overlayMode === 'fos_seismic' && (
+                <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+                  <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-[#10B981] inline-block"/><span>≥ 1.5 Safe</span></div>
+                  <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-[#06B6D4] inline-block"/><span>1.25–1.5 OK</span></div>
+                  <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-[#F59E0B] inline-block"/><span>1.0–1.25 Watch</span></div>
+                  <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-[#F97316] inline-block"/><span>0.85–1.0 Warn</span></div>
+                  <div className="flex items-center gap-1.5 col-span-2"><span className="w-2.5 h-2.5 rounded-sm bg-[#EF4444] inline-block"/><span>&lt; 0.85 Critical</span></div>
+                </div>
+              )}
+
+              {overlayMode === 'stability_class' && (
+                <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+                  <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-[#10B981] inline-block"/><span>Class I (Stable)</span></div>
+                  <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-[#06B6D4] inline-block"/><span>Class II (Low)</span></div>
+                  <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-[#F59E0B] inline-block"/><span>Class III (Mod)</span></div>
+                  <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-[#EF4444] inline-block"/><span>Class IV (Crit)</span></div>
+                </div>
+              )}
+
+              {overlayMode === 'soil_type' && (
+                <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+                  <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-[#D946EF] inline-block"/><span>Moraine</span></div>
+                  <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-[#06B6D4] inline-block"/><span>Regolith</span></div>
+                  <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-[#3B82F6] inline-block"/><span>Gneiss</span></div>
+                  <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-[#F59E0B] inline-block"/><span>Sandstone</span></div>
+                  <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-[#10B981] inline-block"/><span>Alluvium</span></div>
+                  <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-[#8B5CF6] inline-block"/><span>Schist</span></div>
+                </div>
+              )}
+
+              {overlayMode === 'drainage' && (
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-[#2563EB] inline-block"/><span>&gt; 4 km/km² (High)</span></div>
+                  <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-[#06B6D4] inline-block"/><span>2.5–4 (Moderate)</span></div>
+                  <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-[#94A3B8] inline-block"/><span>&lt; 2.5 (Low)</span></div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* 3D terrain or 2D Leaflet */}
           {mapStyle === '3d' ? (
@@ -604,8 +714,9 @@ ${htmlBody}
             </div>
           ) : (
             <MapContainer
-              center={selectedRegion?.center || [25.3, 91.73]}
-              zoom={11}
+              center={selectedRegion?.center || [25.57, 91.31]}
+              zoom={selectedRegion?.key === 'arunachal_w' ? 8 : (selectedRegion?.key === 'sikkim' ? 10 : 11)}
+              preferCanvas={true}
               className="w-full h-full"
               zoomControl={false}
             >
@@ -623,10 +734,10 @@ ${htmlBody}
                   </Popup>
                 </Marker>
               )}
-              {riskGrid && (
+              {displayRiskGrid && (
                 <GeoJSON
-                  key={`${riskGrid.region}_${overlayMode}_${selectedCell?.cell_id || 'none'}`}
-                  data={riskGrid}
+                  key={`${displayRiskGrid.region}_${overlayMode}_${selectedCell?.cell_id || 'none'}`}
+                  data={displayRiskGrid}
                   style={getOverlayStyle}
                   onEachFeature={onEachFeature}
                 />
@@ -647,6 +758,27 @@ ${htmlBody}
                   </Popup>
                 </Circle>
               ))}
+              {/* Crisp, glowing state boundary outline */}
+              {selectedRegion && NE_STATE_BOUNDARIES[selectedRegion.key] && (() => {
+                const coords = NE_STATE_BOUNDARIES[selectedRegion.key].map(([lon, lat]) => [lat, lon]);
+                const borderColor = (STATE_BORDER_COLORS && STATE_BORDER_COLORS[selectedRegion.key]) || '#00C2FF';
+                return (
+                  <>
+                    {/* Subtle outer halo */}
+                    <Polyline
+                      key={`boundary-glow-${selectedRegion.key}`}
+                      positions={coords}
+                      pathOptions={{ color: borderColor, weight: 5, opacity: 0.28, fill: false }}
+                    />
+                    {/* Sharp high-contrast boundary contour */}
+                    <Polyline
+                      key={`boundary-line-${selectedRegion.key}`}
+                      positions={coords}
+                      pathOptions={{ color: borderColor, weight: 2, opacity: 0.92, fill: false }}
+                    />
+                  </>
+                );
+              })()}
             </MapContainer>
           )}
         </div>
