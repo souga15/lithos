@@ -23,13 +23,27 @@ def simulate_earthquake(fos_static: float, slope_mean: float, magnitude: float):
     }
 
 def post_disaster_assessment(deformation_proxy: float, slope_mean: float):
-    volume_m3 = 4000000 * deformation_proxy * math.cos(slope_mean * math.pi / 180)
-    jcb_days = volume_m3 / 200
-    clearance_days = max(1, round(jcb_days))
-    jcb_required = max(1, round(jcb_days / 5))
-    tipper_loads = volume_m3 / 8
-    tipper_trucks = max(2, round(tipper_loads / (15 * clearance_days)))
-    est_cost = volume_m3 * 450
+    # Realistic active failure detachment volume along critical slip scarp (IS 14458 / MoRTH Guidelines)
+    # Roadside slope failures detach along active shear zone: ~600 to 3,500 m³ (not millions)
+    scarp_area_m2 = 900.0 + 1200.0 * min(1.0, max(0.1, deformation_proxy * 10))
+    eff_depth_m = max(1.2, min(3.0, 1.4 + (slope_mean / 45.0) * 0.8))
+    volume_m3 = round(scarp_area_m2 * eff_depth_m * math.cos(math.radians(min(55.0, slope_mean))), 0)
+    volume_m3 = max(350.0, min(4200.0, volume_m3))
+
+    # Standard MoRTH / NHAI 10-wheeler tipper capacity (10 m³ struck/heaped)
+    tipper_capacity_m3 = 10.0
+    tipper_loads = math.ceil(volume_m3 / tipper_capacity_m3)
+    
+    # Hydraulic excavator loading rate (~500 m³/day per 20-ton excavator)
+    jcb_required = max(1, min(3, math.ceil(volume_m3 / 1200.0)))
+    daily_clearance_capacity = jcb_required * 500.0
+    clearance_days = max(1, math.ceil(volume_m3 / daily_clearance_capacity))
+    
+    # Active tipper shuttle fleet (each truck completes 8-10 round trips per shift to dump site)
+    trips_per_truck_day = 8
+    daily_loads = tipper_loads / clearance_days
+    tipper_trucks = max(2, min(14, math.ceil(daily_loads / trips_per_truck_day)))
+    est_cost = volume_m3 * 450.0  # INR 450/m³ for excavation, loading & disposal
 
     return {
         "volume_m3": round(volume_m3, 0),

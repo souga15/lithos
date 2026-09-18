@@ -35,21 +35,23 @@ export const PostDisasterPanel = ({ selectedCell }) => {
           <div className="bg-white/5 p-2 rounded-lg">
             <span className="text-white/40 uppercase block text-[10px]">Tipper Loads</span>
             <span className="font-bold text-white">~{data.tipper_loads}</span>
+            <span className="text-[9px] text-white/40 block">10 m³ capacity</span>
           </div>
           <div className="bg-white/5 p-2 rounded-lg col-span-2">
             <span className="text-white/40 uppercase block text-[10px]">Est Clearance Time</span>
-            <span className="font-bold text-risk-orange">{data.clearance_days} Days</span>
+            <span className="font-bold text-risk-orange">{data.clearance_days} {data.clearance_days === 1 ? 'Day' : 'Days'}</span>
+            <span className="text-[9px] text-white/40 block">{data.tipper_trucks} tippers in active shuttle cycle</span>
           </div>
         </div>
 
         <div className="bg-white/5 p-3 rounded-lg text-xs">
-          <span className="text-white/40 uppercase block text-[10px] mb-1">Evacuation & Equipment</span>
+          <span className="text-white/40 uppercase block text-[10px] mb-1">Staged Emergency Fleet</span>
           <ul className="list-disc pl-4 space-y-1 text-white/80">
-            <li>{data.jcb_required}× JCB Heavy Excavators</li>
-            <li>{data.tipper_trucks}× Tipper Trucks</li>
-            {data.volume_m3 > 5000 && <li>1× Heavy Rock Breaker Unit</li>}
-            <li>Temporary Traffic Control Barriers</li>
-            <li>Geotextile cover for exposed slope</li>
+            <li>{data.jcb_required}× Hydraulic Excavators (~500 m³/day)</li>
+            <li>{data.tipper_trucks}× 10-Wheeler Tipper Trucks (Continuous rotation)</li>
+            {data.volume_m3 > 3000 && <li>1× Heavy Rock Breaker Unit</li>}
+            <li>Pre-fabricated Gabion Baskets &amp; Geotextile Liners</li>
+            <li>NHAI / PWD Rapid Traffic Control Barricades</li>
           </ul>
         </div>
       </div>

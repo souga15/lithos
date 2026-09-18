@@ -49,16 +49,17 @@ const DebrisFlowPanel = ({ selectedCell, onRunoutDataLoaded }) => {
       .finally(() => setLoading(false));
   }, [selectedCell?.cell_id]);
 
-  if (!selectedCell) return null;
-
-  const volumeM3 = runout?.debris_volume_m3 || Math.round((selectedCell.soil_depth_m || 2.0) * 40000 * 0.6);
+  const volumeM3 = runout?.debris_volume_m3 || Math.round((selectedCell.soil_depth_m || 2.0) * 650);
   const runoutDistM = runout?.runout_distance_m || Math.round(Math.max(80, (selectedCell.slope_mean || 30) * 12));
   const dropHeightM = runout?.H_m || Math.round(runoutDistM * 0.2);
   const travelAngle = runout?.travel_angle_deg || 11.0;
 
-  // Real world equivalents for Layman View
-  const tipperLoads = Math.max(1, Math.round(volumeM3 / 8.5)); // standard 10-wheeler ~8.5 m³
-  const olympicPools = (volumeM3 / 2500).toFixed(1); // Olympic pool is 2500 m³
+  // Realistic highway clearance logistics (MoRTH / NHAI Standard 10-Wheeler Tipper: 10 m³ capacity)
+  const tipperCapacityM3 = 10.0;
+  const tipperLoads = Math.max(1, Math.round(volumeM3 / tipperCapacityM3));
+  const stagedTrucks = Math.max(2, Math.min(12, Math.ceil(tipperLoads / 14)));
+  const estClearanceDays = Math.max(1, Math.ceil(tipperLoads / (stagedTrucks * 8)));
+  const olympicPools = (volumeM3 / 2500).toFixed(1);
   const densityTonnePerM3 = 1.95; // compacted wet colluvium ~1.95 t/m³
   const totalWeightTonnes = Math.round(volumeM3 * densityTonnePerM3);
 
@@ -208,9 +209,9 @@ const DebrisFlowPanel = ({ selectedCell, onRunoutDataLoaded }) => {
                 <Truck className="w-5 h-5" />
               </div>
               <div>
-                <span className="text-[9px] text-white/40 uppercase font-black block">Truckload Equivalent</span>
-                <div className="text-base font-black text-white">~{tipperLoads.toLocaleString()}</div>
-                <span className="text-[10px] text-white/50">standard dump trucks</span>
+                <span className="text-[9px] text-white/40 uppercase font-black block">Tipper Truckloads</span>
+                <div className="text-base font-black text-white">~{tipperLoads.toLocaleString()} loads</div>
+                <span className="text-[10px] text-white/50">{stagedTrucks} trucks (~{estClearanceDays} days)</span>
               </div>
             </div>
 
@@ -242,7 +243,7 @@ const DebrisFlowPanel = ({ selectedCell, onRunoutDataLoaded }) => {
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-risk-green font-bold">3.</span>
-                <span><strong>Debris Staging:</strong> Prepare space for approximately <strong>{tipperLoads} tipper trips</strong> to haul away the slide mass once movement stabilizes.</span>
+                <span><strong>Debris Staging:</strong> Stage a fleet of <strong>{stagedTrucks} tipper trucks</strong> (approx. <strong>{tipperLoads} shuttle trips</strong> over ~{estClearanceDays} days) for clearing operations.</span>
               </li>
             </ul>
           </div>

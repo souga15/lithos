@@ -637,11 +637,13 @@ ${htmlBody}
       };
     }
 
+    const isCritical = props.risk_level === 'RED' || (props.fos_seismic != null && props.fos_seismic < 1.0);
+
     return { 
       fillColor: color, 
-      fillOpacity: opacity, 
-      weight: 0.25, 
-      color: 'rgba(255,255,255,0.15)' 
+      fillOpacity: isCritical ? 0.65 : opacity, 
+      weight: isCritical ? 1.0 : 0.25, 
+      color: isCritical ? '#FF3B30' : 'rgba(255,255,255,0.15)' 
     };
   }, [overlayMode, selectedCell]);
 
@@ -703,14 +705,12 @@ ${htmlBody}
         if (selectedRegion.bbox && selectedRegion.bbox.length === 4) {
           const [minX, minY, maxX, maxY] = selectedRegion.bbox;
           map.fitBounds([[minY, minX], [maxY, maxX]], {
-            padding: [24, 24],
-            maxZoom: selectedRegion.key === 'arunachal_w' ? 8 : (selectedRegion.key === 'sikkim' ? 10 : 11),
+            padding: [20, 20],
             animate: true,
             duration: 1.0
           });
         } else if (selectedRegion.center) {
-          const targetZoom = selectedRegion.key === 'arunachal_w' ? 8 : (selectedRegion.key === 'sikkim' ? 10 : 11);
-          map.flyTo(selectedRegion.center, targetZoom, { animate: true, duration: 1.0 });
+          map.flyTo(selectedRegion.center, 11, { animate: true, duration: 1.0 });
         }
       }
     }, [map, selectedRegion?.key, searchResult]);
@@ -847,7 +847,7 @@ ${htmlBody}
           ) : (
             <MapContainer
               center={selectedRegion?.center || [25.57, 91.31]}
-              zoom={selectedRegion?.key === 'arunachal_w' ? 8 : (selectedRegion?.key === 'sikkim' ? 10 : 11)}
+              zoom={11}
               preferCanvas={true}
               className="w-full h-full"
               zoomControl={false}
@@ -899,17 +899,17 @@ ${htmlBody}
                 const borderColor = (STATE_BORDER_COLORS && STATE_BORDER_COLORS[selectedRegion.key]) || '#00C2FF';
                 return (
                   <>
-                    {/* Subtle outer halo */}
-                    <Polyline
+                    {/* Subtle outer glow */}
+                    <Polygon
                       key={`boundary-glow-${selectedRegion.key}`}
                       positions={coords}
-                      pathOptions={{ color: borderColor, weight: 5, opacity: 0.28, fill: false }}
+                      pathOptions={{ color: borderColor, weight: 4, opacity: 0.22, fill: false, interactive: false }}
                     />
                     {/* Sharp high-contrast boundary contour */}
-                    <Polyline
+                    <Polygon
                       key={`boundary-line-${selectedRegion.key}`}
                       positions={coords}
-                      pathOptions={{ color: borderColor, weight: 2, opacity: 0.92, fill: false }}
+                      pathOptions={{ color: borderColor, weight: 2, opacity: 0.90, fill: false, interactive: false, dashArray: '6, 4' }}
                     />
                   </>
                 );
