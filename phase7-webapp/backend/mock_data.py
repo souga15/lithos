@@ -707,58 +707,6 @@ def generate_cells(region_key: str) -> List[Dict]:
                 colab_risk_level=c_risk, colab_fos=c_fos, colab_pred_prob=c_prob
             ))
 
-        # ── Fill uncovered interior pockets to ensure 100% contiguous state coverage ──
-        # Ensures every region completely fills its official state polygon without gaps
-        FILL_CONFIG = {
-            'sikkim': 0.02,       # ~2.0 km fine alpine/glacial coverage
-            'tripura': 0.02,      # ~2.0 km fine ridge/plain coverage
-            'assam_hills': 0.038, # ~3.8 km valley/hill zero-gap coverage
-            'arunachal_w': 0.045, # ~4.5 km Eastern/Central Himalayan range fill
-        }
-        fill_step = FILL_CONFIG.get(region_key)
-        if _b_poly is not None and fill_step is not None:
-            minx, miny, maxx, maxy = _b_poly.bounds
-            sindex = df_region.sindex
-            from shapely.geometry import box as _ShBox, Point as _ShPoint
-
-            fill_cells = []
-            y = miny + fill_step / 2.0
-            while y < maxy:
-                x = minx + fill_step / 2.0
-                while x < maxx:
-                    p = _ShPoint(x, y)
-                    if _b_poly.contains(p):
-                        candidates = list(sindex.intersection((x, y, x, y)))
-                        if not any(df_region.iloc[idx].geometry.contains(p) for idx in candidates):
-                            cell_box = _ShBox(x - fill_step/2.0, y - fill_step/2.0, x + fill_step/2.0, y + fill_step/2.0)
-                            try:
-                                inter = cell_box.intersection(_b_poly)
-                                if not inter.is_empty and inter.area > 1e-7:
-                                    fill_cells.append((x, y, inter))
-                            except Exception:
-                                pass
-                    x += fill_step
-                y += fill_step
-
-            if fill_cells:
-                print(f"[Phase 9] {region_key}: added {len(fill_cells)} contiguous fill units (100% full-state coverage)")
-                for idx, (f_lon, f_lat, f_geom) in enumerate(fill_cells):
-                    if f_geom.geom_type == 'Polygon':
-                        f_coords = [list(c) for c in f_geom.exterior.coords]
-                    elif f_geom.geom_type == 'MultiPolygon':
-                        f_coords = [list(c) for c in max(f_geom.geoms, key=lambda g: g.area).exterior.coords]
-                    else:
-                        continue
-
-                    elev_key = f"{round(f_lat, 5)},{round(f_lon, 5)}"
-                    elevation = terrain_service.cache.get(elev_key, r.uniform(150, 1800))
-                    slope = terrain_service.calculate_true_slope(f_lat, f_lon)
-
-                    cells.append(_build_cell_record(
-                        region_key, reg, r, f_lat, f_lon, slope, elevation,
-                        f_coords, f"{region_key}_fill_{idx:04d}", region_weather
-                    ))
-
         print(f"[Phase 9] {region_key}: total {len(cells)} units perfectly aligned to state boundary")
 
 
