@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
 import axios from 'axios';
 import API_BASE_URL from '../apiConfig';
-import { MapContainer, TileLayer, GeoJSON, useMap, Marker, Popup, Circle, Polyline } from 'react-leaflet';
+import { MapContainer, TileLayer, GeoJSON, useMap, Marker, Popup, Circle, Polyline, Polygon } from 'react-leaflet';
 import { NE_STATE_BOUNDARIES, STATE_BORDER_COLORS } from '../constants/NE_STATE_BOUNDARIES';
 import L from 'leaflet';
-import { HardHat, FileText, Download, Target, Activity, Search, Map as MapIcon } from 'lucide-react';
+import { HardHat, FileText, Download, Target, Activity, Search, Map as MapIcon, Loader2 } from 'lucide-react';
 
 const customIcon = new L.Icon({
   iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
@@ -19,6 +19,7 @@ const customIcon = new L.Icon({
 // Subcomponents
 import EngineerAuth from '../components/Engineer/EngineerAuth';
 import SlopeCrossSection from '../components/Engineer/SlopeCrossSection';
+import DebrisFlowPanel from '../components/Engineer/DebrisFlowPanel';
 import { 
   PostDisasterPanel, 
   CostBenefitPanel, 
@@ -32,7 +33,7 @@ const CesiumTerrain3DLazy = React.lazy(() =>
   import('../components/CesiumTerrain3D').catch(() => ({
     default: () => (
       <div style={{ display:'flex',alignItems:'center',justifyContent:'center',height:'100%',background:'#050d1e' }}>
-        <p style={{ color:'#FF9500',fontSize:13,fontWeight:900,fontFamily:'monospace' }}>⚠ 3D TERRAIN UNAVAILABLE</p>
+        <p style={{ color:'#FF9500',fontSize:12,fontWeight:900,fontFamily:'monospace',letterSpacing:'0.05em' }}>[3D TERRAIN UNAVAILABLE]</p>
       </div>
     )
   }))
@@ -48,6 +49,7 @@ const EngineerPortal = () => {
   const [assessmentMode, setAssessmentMode] = useState(false);
   const [activePortalTab, setActivePortalTab] = useState('analysis'); // analysis, hardware
   const [sensorAlerts, setSensorAlerts] = useState([]);
+  const [activeRunoutData, setActiveRunoutData] = useState(null);
 
   // New features: Map style and Search
   const [mapStyle, setMapStyle] = useState('dark');
@@ -177,7 +179,7 @@ const EngineerPortal = () => {
   .footer{margin-top:16px;padding-top:8px;border-top:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;font-size:7.5pt;color:#9ca3af;}
   .print-btn{position:fixed;top:16px;right:16px;background:#0056b3;color:#fff;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;font-weight:700;font-size:11pt;box-shadow:0 2px 8px rgba(0,0,0,.2);}
 </style></head><body>
-<button class="print-btn no-print" onclick="window.print()">🖨️ Print / Save PDF</button>
+<button class="print-btn no-print" onclick="window.print()">Print / Save PDF</button>
 ${htmlBody}
 </body></html>`);
     win.document.close();
@@ -199,7 +201,7 @@ ${htmlBody}
     const html = `
 <div class="header">
   <div class="header-left">
-    <h1>⛰️ LITHOS Geotechnical Report</h1>
+    <h1>LITHOS Geotechnical Report</h1>
     <p>Landslide Intelligence · Temporal & Hyperlocal Observation System</p>
   </div>
   <div class="header-right">
@@ -332,7 +334,7 @@ ${htmlBody}
 </div>
 
 <div class="ref-note">
-  ⚠️&nbsp; Risk: <span class="badge ${riskBadge}">${c.risk_level || 'N/A'}</span> &nbsp;|&nbsp;
+  Risk Assessment: <span class="badge ${riskBadge}">${c.risk_level || 'N/A'}</span> &nbsp;|&nbsp;
   FoS Seismic: <strong>${(c.fos_seismic || 0).toFixed(2)}</strong> &nbsp;|&nbsp;
   Stability: <strong>${c.stability_class || 'N/A'}</strong> &nbsp;|&nbsp;
   Slope: <strong>${c.slope_mean || 0}°</strong> &nbsp;|&nbsp;
@@ -370,7 +372,7 @@ ${htmlBody}
 
 <div class="section">
   <div class="section-title">C · Soil & Geology Inspection</div>
-  <div class="ref-note">LITHOS Soil: <strong>${(c.soil_type || '').replace(/_/g,' ')}</strong> · Depth: <strong>${c.soil_depth_m || 0} m</strong> · Liquefaction Flag: <strong>${c.liquefaction_risk ? 'YES ⚠️' : 'No'}</strong></div>
+  <div class="ref-note">LITHOS Soil: <strong>${(c.soil_type || '').replace(/_/g,' ')}</strong> · Depth: <strong>${c.soil_depth_m || 0} m</strong> · Liquefaction Flag: <strong>${c.liquefaction_risk ? 'HIGH RISK' : 'No'}</strong></div>
   ${checkItem('Confirm soil type at surface: _______________________________')}
   ${checkItem('Visible weathering grade: &nbsp;[ ] Fresh &nbsp;[ ] Slightly &nbsp;[ ] Moderately &nbsp;[ ] Highly')}
   ${checkItem('Rock outcrops present: &nbsp;[ ] Yes &nbsp;[ ] No')}
@@ -636,7 +638,7 @@ ${htmlBody}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
               <button disabled={isSearching} type="submit" className="p-2.5 hover:bg-white/10 transition-colors text-white/70 hover:text-white border-l border-white/20">
-                {isSearching ? <span className="animate-spin text-xs">🌀</span> : <Search className="w-4 h-4" />}
+                {isSearching ? <Loader2 className="w-4 h-4 animate-spin text-[#00C2FF]" /> : <Search className="w-4 h-4" />}
               </button>
             </form>
           </div>
@@ -751,7 +753,10 @@ ${htmlBody}
                 >
                   <Popup className="glass-popup">
                     <div className="p-2 text-center">
-                      <div className="text-risk-red font-black text-[10px] uppercase mb-1">⚠️ SENSOR TRIGGERED</div>
+                      <div className="text-risk-red font-black text-[10px] uppercase tracking-wider mb-1 flex items-center justify-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-risk-red animate-ping" />
+                        <span>SENSOR TRIGGERED</span>
+                      </div>
                       <div className="text-xs font-bold text-white mb-1">{alert.sensor_type.toUpperCase()} node: {alert.sensor_id}</div>
                       <div className="text-[10px] text-white/50">{alert.message}</div>
                     </div>
@@ -777,6 +782,37 @@ ${htmlBody}
                       pathOptions={{ color: borderColor, weight: 2, opacity: 0.92, fill: false }}
                     />
                   </>
+                );
+              })()}
+              {/* Predicted Debris Runout Cone for Selected Cell */}
+              {activeRunoutData?.fan_polygon?.coordinates?.[0] && (() => {
+                const fanCoords = activeRunoutData.fan_polygon.coordinates[0].map(c => [c[1], c[0]]);
+                return (
+                  <Polygon
+                    key={`runout-fan-${selectedCell?.cell_id}`}
+                    positions={fanCoords}
+                    pathOptions={{
+                      fillColor: '#FF9500',
+                      fillOpacity: 0.35,
+                      color: '#FF3B30',
+                      weight: 2,
+                      dashArray: '6, 4',
+                    }}
+                  >
+                    <Popup className="glass-popup">
+                      <div className="p-2 text-white min-w-[200px]">
+                        <div className="text-[10px] font-black uppercase text-[#FF9500] tracking-wider mb-1 flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-[#FF9500]" />
+                          <span>DEBRIS RUNOUT IMPACT CONE</span>
+                        </div>
+                        <div className="text-xs space-y-1">
+                          <p><strong>Reach:</strong> {activeRunoutData.runout_distance_m} m</p>
+                          <p><strong>Failed Mass:</strong> {activeRunoutData.debris_volume_m3?.toLocaleString()} m³</p>
+                          <p className="text-[10px] text-white/70 mt-1 leading-snug">{activeRunoutData.recommended_action}</p>
+                        </div>
+                      </div>
+                    </Popup>
+                  </Polygon>
                 );
               })()}
             </MapContainer>
@@ -909,6 +945,11 @@ ${htmlBody}
               )}
 
               <SlopeCrossSection selectedCell={selectedCell} />
+
+              <DebrisFlowPanel 
+                selectedCell={selectedCell} 
+                onRunoutDataLoaded={setActiveRunoutData} 
+              />
 
               {/* Trigger Level System */}
               <div className="glass p-4 rounded-xl border-white/10">

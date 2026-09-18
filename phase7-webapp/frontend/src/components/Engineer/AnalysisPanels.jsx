@@ -143,7 +143,7 @@ export const EarthquakeScenarioPanel = ({ selectedCell }) => {
           <div>{kh_sim.toFixed(2)}</div>
           <div className={simulated_fos < 1.0 ? 'text-risk-red font-bold' : simulated_fos < 1.5 ? 'text-risk-orange' : 'text-risk-green'}>{simulated_fos.toFixed(2)}</div>
           <div className={simulated_fos < 1.0 ? 'bg-risk-red/20 text-risk-red px-1 rounded text-center font-bold text-[9px]' : simulated_fos < 1.5 ? 'bg-risk-orange/20 text-risk-orange px-1 rounded text-center font-bold text-[9px]' : 'bg-risk-green/20 text-risk-green px-1 rounded text-center font-bold text-[9px]'}>
-            {simulated_fos < 1.0 ? 'FAIL 🔴' : simulated_fos < 1.5 ? 'MARGINAL ⚠️' : 'STABLE ✅'}
+            {simulated_fos < 1.0 ? 'FAIL' : simulated_fos < 1.5 ? 'MARGINAL' : 'STABLE'}
           </div>
         </div>
         {simulated_fos < 1.0 && (
