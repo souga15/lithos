@@ -146,23 +146,32 @@ function update(beta, gamma) {
 
 async function doAlert(tilt) {
   const now = Date.now();
-  if(now-lastAlertTs < 15000) return;
+  if(now-lastAlertTs < 5000) return;
   lastAlertTs = now;
   try {
-    await fetch(API+'/api/sensor/report',{
+    const res = await fetch(API+'/api/sensor/report',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({sensor_id:sid,lat:DLAT,lon:DLON,type:'tilt',value:parseFloat(tilt.toFixed(2)),battery:95})
     });
+    if(!res.ok) {
+      console.warn('Sensor report server error:', res.status);
+      document.getElementById('sr').textContent = '⚠️ Server HTTP ' + res.status;
+      return;
+    }
     alerts++;
     document.getElementById('lc').textContent = alerts;
     document.getElementById('lh').style.display='flex';
+    document.getElementById('sr').textContent = '📡 Alert transmitted to LITHOS (' + tilt.toFixed(1) + '°)';
     const el=document.createElement('div');
     el.className='log-i';
-    el.innerHTML='<span class="lt">🔴 '+tilt.toFixed(1)+'°</span><span class="ltime">'+new Date().toLocaleTimeString()+'</span>';
+    el.innerHTML='<span class="lt">🔴 '+tilt.toFixed(1)+'° Transmitted</span><span class="ltime">'+new Date().toLocaleTimeString()+'</span>';
     const L=document.getElementById('ll');
     L.insertBefore(el,L.firstChild);
     if(L.children.length>5) L.removeChild(L.lastChild);
-  } catch(e){}
+  } catch(e){
+    console.error('Sensor report network error:', e);
+    document.getElementById('sr').textContent = '❌ Network Error sending to ' + API;
+  }
 }
 
 async function start() {

@@ -1242,17 +1242,20 @@ class SensorReport(BaseModel):
 
 @app.post("/api/sensor/report")
 async def receive_sensor_data(data: SensorReport):
-    # Log to console for debugging
-    print(f"📡 IoT EVENT: {data.sensor_id} | Type: {data.type} | Value: {data.value}")
+    # Log to console safely without emojis causing cp1252 crash
+    print(f"[IoT EVENT] {data.sensor_id} | Type: {data.type} | Value: {data.value}", flush=True)
     
     # Trigger a real-time WebSocket alert
     alert_msg = {
         "type": "sensor_alert",
+        "level": "RED",
+        "region": "FIELD SENSOR",
         "sensor_id": data.sensor_id,
-        "lat": data.lat, "lon": data.lon,
+        "lat": data.lat,
+        "lon": data.lon,
         "sensor_type": data.type,
         "value": data.value,
-        "message": f"GROUND MOVEMENT: {data.type.upper()} trigger at {data.sensor_id}",
+        "message": f"CRITICAL GROUND TILT: {data.value}° recorded by {data.sensor_id} (IS 14458 Threshold Exceeded)",
         "timestamp": datetime.utcnow().isoformat() + "Z",
     }
     await alert_manager.broadcast(alert_msg)

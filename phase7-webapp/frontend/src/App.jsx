@@ -1,6 +1,7 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Radio, X } from 'lucide-react';
+import API_BASE_URL from './apiConfig';
 
 // Lazy load ALL pages so a single broken import doesn't crash the whole app
 const Navbar      = React.lazy(() => import('./components/Navbar'));
@@ -89,6 +90,7 @@ class ErrorBoundary extends React.Component {
 function App() {
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [alertCount, setAlertCount] = useState(0);
+  const [activeSensorAlert, setActiveSensorAlert] = useState(null);
 
   useEffect(() => {
     const handleOnline = () => setIsOffline(false);
@@ -103,6 +105,38 @@ function App() {
     };
   }, []);
 
+  // Global WebSocket listener for real-time Phone & Field IoT Sensor alerts
+  useEffect(() => {
+    const wsUrl = API_BASE_URL.replace('http', 'ws') + '/ws/alerts';
+    let ws;
+    let reconnectTimeout;
+
+    const connect = () => {
+      try {
+        ws = new WebSocket(wsUrl);
+        ws.onmessage = (ev) => {
+          try {
+            const d = JSON.parse(ev.data);
+            if (d.type === 'sensor_alert') {
+              setActiveSensorAlert(d);
+              setAlertCount(prev => prev + 1);
+            }
+          } catch (_) {}
+        };
+        ws.onclose = () => {
+          reconnectTimeout = setTimeout(connect, 3000);
+        };
+      } catch (_) {}
+    };
+
+    connect();
+
+    return () => {
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      if (ws) ws.close();
+    };
+  }, []);
+
   return (
     <Router>
       <ErrorBoundary name="App Shell">
@@ -111,6 +145,36 @@ function App() {
             <ErrorBoundary name="Navbar">
               <Navbar alertCount={alertCount} isOffline={isOffline} />
             </ErrorBoundary>
+
+            {/* Global Live IoT / Phone Sensor Alert Banner across all pages */}
+            {activeSensorAlert && (
+              <div className="bg-gradient-to-r from-rose-950 via-rose-900 to-rose-950 border-b-2 border-rose-500 px-4 py-2.5 flex items-center justify-between z-50 backdrop-blur-xl shadow-[0_4px_25px_rgba(225,29,72,0.4)] animate-bounce-short">
+                <div className="flex items-center gap-3">
+                  <span className="relative flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500"></span>
+                  </span>
+                  <span className="bg-rose-500/20 text-rose-300 px-2 py-0.5 rounded text-[10px] font-black tracking-widest uppercase border border-rose-500/40">
+                    LIVE IOT SENSOR ALERT
+                  </span>
+                  <span className="text-white text-xs font-bold font-mono">
+                    {activeSensorAlert.message || `GROUND DISPLACEMENT DETECTED: ${activeSensorAlert.value}° tilt`}
+                  </span>
+                  <span className="text-white/60 text-[10px] font-mono">
+                    [{activeSensorAlert.sensor_id || 'PHONE-NODE'}] • {new Date(activeSensorAlert.timestamp || Date.now()).toLocaleTimeString()}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => setActiveSensorAlert(null)}
+                    className="flex items-center gap-1 text-white/70 hover:text-white px-2.5 py-1 bg-white/10 hover:bg-white/20 rounded-md text-[10px] font-bold transition-all"
+                  >
+                    <X className="w-3 h-3" /> DISMISS
+                  </button>
+                </div>
+              </div>
+            )}
+
             {isOffline && (
               <ErrorBoundary name="OfflineBanner">
                 <OfflineBanner />
