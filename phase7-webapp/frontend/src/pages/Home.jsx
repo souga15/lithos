@@ -250,17 +250,6 @@ const Home = ({ setAlertCount }) => {
               <span>3D PINN HEATMAP</span>
             </button>
 
-            <button
-              onClick={() => setMapMode('3d-mesh')}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                mapMode === '3d-mesh'
-                  ? 'bg-accent text-bg shadow-[0_0_15px_rgba(43,158,255,0.6)] font-black'
-                  : 'text-white/60 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5" />
-              <span>3D TERRAIN MESH</span>
-            </button>
           </div>
 
           {mapMode === '2d' && <SatelliteToggle active={layerType} onChange={setLayerType} />}
