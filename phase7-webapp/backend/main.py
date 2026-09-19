@@ -47,8 +47,11 @@ import engineer_service
 from sos_service import log_sos_event, get_sos_log
 from blockage_service import add_blockage, get_active_blockages, get_blockages_geojson, confirm_blockage
 from user_tracking import update_position, get_active_positions, get_zone_counts
+try:
+    import torch
+except ImportError:
+    torch = None
 from pinn_model import dummy_train_model, calculate_fos
-import torch
 
 from mock_data import ALL_REPORTS
 
@@ -416,18 +419,25 @@ def pinn_predict(req: PINNRequest):
     # Calculate FoS statically
     fos_static, fos_seismic = calculate_fos(x)
     
-    # Convert to tensor for model inferencing
-    x_tensor = torch.tensor([x], dtype=torch.float32)
-    
-    # Predict with Uncertainty (MC Dropout)
-    try:
-        mean_prob, std_prob = model.predict_with_uncertainty(x_tensor, n_samples=30)
-        prob = mean_prob.item()
-        uncertainty = std_prob.item()
-    except Exception as e:
-        # Fallback if uncertainty fails
-        prob = model(x_tensor).item()
-        uncertainty = 0.05
+    if torch is not None and hasattr(model, 'predict_with_uncertainty'):
+        x_tensor = torch.tensor([x], dtype=torch.float32)
+        try:
+            mean_prob, std_prob = model.predict_with_uncertainty(x_tensor, n_samples=30)
+            prob = mean_prob.item() if hasattr(mean_prob, 'item') else float(mean_prob)
+            uncertainty = std_prob.item() if hasattr(std_prob, 'item') else float(std_prob)
+        except Exception as e:
+            # Fallback if uncertainty fails
+            res = model(x_tensor)
+            prob = res.item() if hasattr(res, 'item') else float(res)
+            uncertainty = 0.05
+    else:
+        try:
+            mean_prob, std_prob = model.predict_with_uncertainty(x)
+            prob = float(mean_prob)
+            uncertainty = float(std_prob)
+        except Exception:
+            prob = float(1.0 / (1.0 + math.exp(6.0 * (fos_seismic - 1.0))))
+            uncertainty = 0.05
         
     risk_level = "GREEN"
     score = prob
@@ -1393,7 +1403,10 @@ def _get_enriched_df():
 @app.get("/api/terrain/3d-heatmap-mesh")
 def get_3d_heatmap_mesh(region: str = Query(default="sikkim"), grid_res: int = Query(default=60)):
     import numpy as np
-    import torch
+    try:
+        import torch
+    except ImportError:
+        torch = None
     from scipy.interpolate import griddata
     from mock_data import _PINN, _SLOPE_UNITS_GDF
 
@@ -1482,12 +1495,17 @@ def get_3d_heatmap_mesh(region: str = Query(default="sikkim"), grid_res: int = Q
                 rf72 = row.get("rain72h_climatic", 90.0)
                 feats.append([slope, c, phi, z, sat, pga, ndvi, soil_f, rf72])
                 
-            xt = torch.tensor(feats, dtype=torch.float32)
-            with torch.no_grad():
-                if _PINN:
+            if torch is not None and _PINN:
+                xt = torch.tensor(feats, dtype=torch.float32)
+                with torch.no_grad():
                     probs = _PINN(xt).squeeze().cpu().numpy()
-                else:
-                    probs = np.random.uniform(0.1, 0.9, len(df))
+            elif _PINN:
+                probs = _PINN(feats)
+            else:
+                probs = np.array([
+                    1.0 / (1.0 + np.exp(6.0 * (calculate_fos(f)[1] - 1.0)))
+                    for f in feats
+                ])
             if np.ndim(probs) == 0:
                 probs = np.array([probs.item()])
             p_med = float(np.median(probs))
