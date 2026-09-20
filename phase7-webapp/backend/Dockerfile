@@ -22,7 +22,8 @@ RUN pip install --no-cache-dir --upgrade -r requirements.txt
 
 COPY --chown=user:user . .
 
-# Default HuggingFace port
-EXPOSE 7860
+# Use dynamic port from Render (falls back to 8000 locally)
+EXPOSE 8000
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]
+# Shell form so $PORT env variable is expanded at runtime
+CMD uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
