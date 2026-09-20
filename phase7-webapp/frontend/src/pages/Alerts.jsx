@@ -40,13 +40,8 @@ const Alerts = () => {
     }, 6000);
 
     // WebSocket live stream
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    let wsHost = window.location.host;
-    // In dev, if frontend is 5173/5174 and backend is 8000
-    if (window.location.port !== '8000') {
-      wsHost = `${window.location.hostname}:8000`;
-    }
-    const wsUrl = `${protocol}//${wsHost}/ws/alerts`;
+    const wsBase = API_BASE_URL.replace(/^http/, 'ws');
+    const wsUrl = `${wsBase}/ws/alerts`;
 
     try {
       const ws = new WebSocket(wsUrl);

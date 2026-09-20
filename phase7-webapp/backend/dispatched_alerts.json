@@ -1,5 +1,73 @@
 [
   {
+    "alert_id": "ALT-54CD5BF0",
+    "recipient": "sougatakarm29@gmail.com",
+    "timestamp": "2026-09-19T16:56:23Z",
+    "region": "sikkim",
+    "region_name": "Sikkim",
+    "email_delivery": {
+      "delivered": true,
+      "mode": "SIMULATED_GATEWAY_DISPATCH",
+      "detail": "Simulated emergency broadcast dispatched to sougatakarm29@gmail.com (Gateway verified)"
+    },
+    "alert_data": {
+      "alert_id": "ALT-54CD5BF0",
+      "region": "sikkim",
+      "region_name": "Sikkim",
+      "risk_level": "RED",
+      "message": "EMERGENCY HAZARD WARNING: Very high risk area detected along Sikkim. Limit-equilibrium Factor of Safety has decreased to 0.74 due to 134mm 24h precipitation. Precautionary evacuation recommended.",
+      "triggered_at": "2026-09-19T16:56:23Z",
+      "rainfall_24h": 134.8,
+      "top_factor": "pore_pressure_saturation",
+      "pinn_failure_probability": 0.946,
+      "fos_static": 0.74,
+      "fos_seismic": 0.61,
+      "recommended_route": "Divert via NH-717A Alternative Bypass (+24 min travel time)",
+      "is_active": true,
+      "recipient": "sougatakarm29@gmail.com",
+      "channels": [
+        "EMAIL_HTML",
+        "CAP_V1.2_XML",
+        "GSM_CELL_BROADCAST_2G",
+        "WEBSOCKET_PUSH"
+      ]
+    }
+  },
+  {
+    "alert_id": "ALT-F618AA1A",
+    "recipient": "sougatakarm29@gmail.com",
+    "timestamp": "2026-09-19T08:55:18Z",
+    "region": "sikkim",
+    "region_name": "Sikkim",
+    "email_delivery": {
+      "delivered": true,
+      "mode": "SIMULATED_GATEWAY_DISPATCH",
+      "detail": "Simulated emergency broadcast dispatched to sougatakarm29@gmail.com (Gateway verified)"
+    },
+    "alert_data": {
+      "alert_id": "ALT-F618AA1A",
+      "region": "sikkim",
+      "region_name": "Sikkim",
+      "risk_level": "RED",
+      "message": "EMERGENCY HAZARD WARNING: Very high risk area detected along Sikkim. Limit-equilibrium Factor of Safety has decreased to 0.74 due to 134mm 24h precipitation. Precautionary evacuation recommended.",
+      "triggered_at": "2026-09-19T08:55:18Z",
+      "rainfall_24h": 134.8,
+      "top_factor": "pore_pressure_saturation",
+      "pinn_failure_probability": 0.946,
+      "fos_static": 0.74,
+      "fos_seismic": 0.61,
+      "recommended_route": "Divert via NH-717A Alternative Bypass (+24 min travel time)",
+      "is_active": true,
+      "recipient": "sougatakarm29@gmail.com",
+      "channels": [
+        "EMAIL_HTML",
+        "CAP_V1.2_XML",
+        "GSM_CELL_BROADCAST_2G",
+        "WEBSOCKET_PUSH"
+      ]
+    }
+  },
+  {
     "alert_id": "ALT-4B67BD75",
     "recipient": "sougatakarm29@gmail.com",
     "timestamp": "2026-09-18T21:45:15Z",

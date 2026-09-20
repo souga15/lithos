@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: lithos-backend
+    runtime: python
+    plan: free
+    rootDir: phase7-webapp/backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: python run_backend.py
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
