@@ -1,18 +1,26 @@
 import math
+import os
+import hashlib
+
+# Engineer credentials from environment (never hardcode in production)
+_ENGINEER_EMAIL = os.getenv("LITHOS_ENGINEER_EMAIL", "engineer@lithos.gov")
+_ENGINEER_PASS_HASH = hashlib.sha256(os.getenv("LITHOS_ENGINEER_PASS", "admin").encode()).hexdigest()
+_ENGINEER_ACCESS_CODE = os.getenv("LITHOS_ENGINEER_CODE", "LITHOS-ENG-26")
 
 def verify_engineer_auth(email, password, mode, access_code=None):
     email = email.strip() if email else email
     password = password.strip() if password else password
     
     if mode == 'signup':
-        if access_code != 'LITHOS-ENG-26':
+        if access_code != _ENGINEER_ACCESS_CODE:
             return {"success": False, "error": "Invalid Engineering Access Code."}
-        return {"success": True, "token": "mock-jwt-token-7382"}
+        return {"success": True, "token": hashlib.sha256(f"{email}{access_code}".encode()).hexdigest()[:32]}
     else:
-        if email == 'engineer@lithos.gov' and password == 'admin':
-            return {"success": True, "token": "mock-jwt-token-7382"}
+        password_hash = hashlib.sha256(password.encode()).hexdigest() if password else ""
+        if email == _ENGINEER_EMAIL and password_hash == _ENGINEER_PASS_HASH:
+            return {"success": True, "token": hashlib.sha256(f"{email}{password_hash}".encode()).hexdigest()[:32]}
         else:
-            return {"success": False, "error": "Invalid credentials. Hint: use engineer@lithos.gov / admin"}
+            return {"success": False, "error": "Invalid credentials."}
 
 def simulate_earthquake(fos_static: float, slope_mean: float, magnitude: float):
     kh_sim = 0.05 * math.pow(10, 0.5 * (magnitude - 5))

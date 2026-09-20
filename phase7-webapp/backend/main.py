@@ -18,13 +18,16 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import hashlib
+import time
+from collections import defaultdict
+from xml.sax.saxutils import escape as xml_escape
 
 import numpy as np
 from scipy.interpolate import griddata
 from scipy.ndimage import gaussian_filter, distance_transform_edt
 from PIL import Image as PILImage, ImageDraw, ImageFilter
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query, Response
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -78,13 +81,36 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Production CORS: restrict to known origins only
+_ALLOWED_ORIGINS = os.getenv("LITHOS_CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173,https://lithos.tech,https://www.lithos.tech").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "*"],
+    allow_origins=_ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ─── Rate Limiter ─────────────────────────────────────────────────────────────
+_rate_limit_store: Dict[str, list] = defaultdict(list)
+RATE_LIMIT_WINDOW = 60  # seconds
+RATE_LIMIT_MAX = 10     # max requests per window per IP
+
+def _check_rate_limit(client_ip: str, max_requests: int = RATE_LIMIT_MAX) -> bool:
+    """Returns True if the request should be BLOCKED."""
+    now = time.time()
+    _rate_limit_store[client_ip] = [t for t in _rate_limit_store[client_ip] if now - t < RATE_LIMIT_WINDOW]
+    if len(_rate_limit_store[client_ip]) >= max_requests:
+        return True
+    _rate_limit_store[client_ip].append(now)
+    return False
+
+# ─── Admin API Key ────────────────────────────────────────────────────────────
+ADMIN_API_KEY = os.getenv("LITHOS_ADMIN_KEY", "lithos-admin-key-2026")
+
+def _verify_admin_key(api_key: str) -> bool:
+    return api_key == ADMIN_API_KEY
 
 # ─── WebSocket Manager ────────────────────────────────────────────────────────
 class ConnectionManager:
@@ -850,22 +876,136 @@ def get_active_alerts():
     return {"active_alerts": active, "count": len(active)}
 
 
+SUBSCRIBERS_FILE = os.path.join(os.path.dirname(__file__), "subscribers.json")
+
+
+def _load_subscribers() -> List[Dict]:
+    """Load persistent alert subscribers from disk."""
+    if os.path.exists(SUBSCRIBERS_FILE):
+        try:
+            with open(SUBSCRIBERS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            logger.warning(f"Error loading subscribers: {e}")
+    return []
+
+
+def _save_subscribers(subs: List[Dict]):
+    """Save persistent alert subscribers to disk."""
+    try:
+        with open(SUBSCRIBERS_FILE, "w", encoding="utf-8") as f:
+            json.dump(subs, f, indent=2)
+    except Exception as e:
+        logger.warning(f"Error saving subscribers: {e}")
+
+
 class SubscribeRequest(BaseModel):
     email: str
     regions: List[str] = []
 
 
-@app.post("/api/alerts/subscribe")
-def subscribe(req: SubscribeRequest):
+@app.get("/api/alerts/subscribers")
+def get_subscribers(admin_key: str = Query(None)):
+    if not admin_key or not _verify_admin_key(admin_key):
+        raise HTTPException(status_code=403, detail="Forbidden: valid admin_key required.")
+    subs = _load_subscribers()
     return {
-        "success": True,
-        "message": f"✅ Subscribed! You'll receive real-time critical alerts for {len(req.regions) or 'all'} region(s).",
-        "email": req.email,
-        "regions": req.regions or list(ALL_REGIONS.keys()),
+        "count": len(subs),
+        "subscribers": subs
     }
 
 
-class AlertSendTestRequest(BaseModel):
+@app.post("/api/alerts/subscribe")
+def subscribe(req: SubscribeRequest, request: Request):
+    if request.client and _check_rate_limit(request.client.host):
+        raise HTTPException(status_code=429, detail="Too many requests. Please try again later.")
+    email = req.email.strip().lower()
+    if not email or "@" not in email:
+        raise HTTPException(status_code=400, detail="Invalid email address.")
+    
+    subs = _load_subscribers()
+    now_str = _iso(_now())
+    matched = False
+    for s in subs:
+        if s.get("email") == email:
+            s["regions"] = req.regions or list(ALL_REGIONS.keys())
+            s["updated_at"] = now_str
+            matched = True
+            break
+    if not matched:
+        subs.append({
+            "email": email,
+            "regions": req.regions or list(ALL_REGIONS.keys()),
+            "subscribed_at": now_str,
+            "active": True
+        })
+    _save_subscribers(subs)
+    
+    return {
+        "success": True,
+        "message": f"✅ Subscribed {email}! You will receive real-time critical hazard alerts.",
+        "email": email,
+        "regions": req.regions or list(ALL_REGIONS.keys()),
+        "total_subscribers": len(subs)
+    }
+
+
+@app.get("/api/alerts/cap.xml")
+@app.get("/api/alerts/{alert_id}/cap.xml")
+def get_cap_xml(alert_id: Optional[str] = None):
+    """Returns official OASIS Common Alerting Protocol (CAP v1.2) XML."""
+    persisted = _load_dispatched_alerts()
+    all_combined = list(persisted) + list(ALL_ALERTS)
+    target = None
+    if alert_id:
+        target = next((a for a in all_combined if a.get("alert_id") == alert_id), None)
+    if not target and all_combined:
+        target = all_combined[0]
+        
+    if not target:
+        target = {
+            "alert_id": "ALT-SYS-DEMO",
+            "region": "sikkim",
+            "region_name": "Sikkim Corridor",
+            "risk_level": "RED",
+            "message": "Critical landslide hazard active. Slope stability degraded.",
+            "triggered_at": _iso(_now()),
+            "recommended_route": "NH-717A bypass corridor"
+        }
+        
+    identifier = xml_escape(target.get("alert_id", "ALT-001"))
+    sender = "warning-center@lithos.tech"
+    sent = xml_escape(target.get("triggered_at", _iso(_now())))
+    headline = xml_escape(f"LANDSLIDE HAZARD WARNING: {target.get('region_name', target.get('region', 'Region'))}")
+    desc = xml_escape(target.get("message", "Immediate slope failure risk detected."))
+    instruction = xml_escape(target.get("recommended_route", "Follow safe bypass highway."))
+    area_desc = xml_escape(target.get('region_name', 'Himalayan Corridor'))
+    
+    xml_content = f"""<?xml version="1.0" encoding="UTF-8"?>
+<alert xmlns="urn:oasis:names:tc:emergency:cap:1.2">
+  <identifier>{identifier}</identifier>
+  <sender>{sender}</sender>
+  <sent>{sent}</sent>
+  <status>Actual</status>
+  <msgType>Alert</msgType>
+  <scope>Public</scope>
+  <info>
+    <category>Geo</category>
+    <event>Landslide / Slope Failure</event>
+    <urgency>Immediate</urgency>
+    <severity>Severe</severity>
+    <certainty>Observed</certainty>
+    <headline>{headline}</headline>
+    <description>{desc}</description>
+    <instruction>{instruction}</instruction>
+    <contact>emergency@ndma.gov.in</contact>
+    <area>
+      <areaDesc>{area_desc}</areaDesc>
+    </area>
+  </info>
+</alert>"""
+    return Response(content=xml_content, media_type="application/xml")
+
     email: str
     region: Optional[str] = "sikkim"
     message: Optional[str] = None
@@ -913,7 +1053,9 @@ def _send_email_smtp(recipient_email: str, subject: str, html_body: str, text_bo
 
 
 @app.post("/api/alerts/send-test")
-async def send_test_alert(req: AlertSendTestRequest):
+async def send_test_alert(req: AlertSendTestRequest, request: Request):
+    if request.client and _check_rate_limit(request.client.host):
+        raise HTTPException(status_code=429, detail="Too many requests. Please try again later.")
     email = req.email.strip()
     if not email or "@" not in email:
         raise HTTPException(status_code=400, detail="Please enter a valid email address.")
@@ -1162,7 +1304,9 @@ class ReportSubmit(BaseModel):
 
 
 @app.post("/api/reports/submit")
-async def submit_report_endpoint(req: ReportSubmit):
+async def submit_report_endpoint(req: ReportSubmit, request: Request):
+    if request.client and _check_rate_limit(request.client.host):
+        raise HTTPException(status_code=429, detail="Too many requests. Please try again later.")
     result = submit_report(req.lat, req.lon, req.type, req.severity, req.user_id,
                            req.photo_base64, req.description)
     if "error" in result:
@@ -1302,7 +1446,9 @@ class SOSRequest(BaseModel):
     message: str = "EMERGENCY SOS"
 
 @app.post("/api/sos")
-async def receive_sos(req: SOSRequest):
+async def receive_sos(req: SOSRequest, request: Request):
+    if request.client and _check_rate_limit(request.client.host):
+        raise HTTPException(status_code=429, detail="Too many requests. Please try again later.")
     event = log_sos_event(req.lat, req.lon, req.region, req.message)
     await alert_manager.broadcast({
         "type":      "sos_alert",
@@ -1323,7 +1469,9 @@ class BlockageRequest(BaseModel):
     message: str = "Road blocked"
 
 @app.post("/api/blockage")
-async def report_blockage(req: BlockageRequest):
+async def report_blockage(req: BlockageRequest, request: Request):
+    if request.client and _check_rate_limit(request.client.host):
+        raise HTTPException(status_code=429, detail="Too many requests. Please try again later.")
     entry = add_blockage(req.lat, req.lon, req.message)
     await alert_manager.broadcast({
         "type":    "blockage_alert",

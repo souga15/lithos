@@ -92,3 +92,13 @@ personal_report*
 lithos-final/
 
 
+
+# LITHOS sensitive files
+gee_credentials.json
+**/gee_credentials.json
+subscribers.json
+**/subscribers.json
+sos_log.json
+**/sos_log.json
+dispatched_alerts.json
+**/dispatched_alerts.json
