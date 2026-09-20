@@ -27,7 +27,7 @@ rtree
 rasterio
 
 # ML
-torch --index-url https://download.pytorch.org/whl/cpu
+torch --extra-index-url https://download.pytorch.org/whl/cpu
 
 # Google Earth Engine
 earthengine-api
