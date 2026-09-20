@@ -18,6 +18,8 @@ USER user
 ENV PATH="/home/user/.local/bin:$PATH"
 
 COPY --chown=user:user requirements.txt .
+# Install CPU-only PyTorch first (200MB vs 2GB full version)
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
 RUN pip install --no-cache-dir --upgrade -r requirements.txt
 
 COPY --chown=user:user . .
