@@ -9,7 +9,7 @@ python-dotenv
 aiohttp
 jinja2
 
-# Data / Science (lightweight)
+# Data / Science
 numpy
 pandas
 scipy
@@ -17,11 +17,21 @@ scikit-learn
 xgboost
 shapely
 Pillow
+matplotlib
+
+# Geospatial (needs GDAL — installed via Dockerfile apt-get)
+geopandas
+pyogrio
+fiona
+rtree
+rasterio
+
+# ML
+torch --index-url https://download.pytorch.org/whl/cpu
+
+# Google Earth Engine
+earthengine-api
 
 # Auth
 python-jose[cryptography]
 passlib[bcrypt]
-
-# NOTE: torch, rasterio, geopandas, fiona, pyogrio, earthengine-api
-# are excluded from deployment — they exceed Render free-tier RAM (512MB).
-# The app falls back to physics-based calculations automatically.

@@ -51,9 +51,8 @@ seen_titles.json
 hf_space/
 
 # Large Datasets & Raw Satellite Archives (>50MB / GitHub 100MB Limit)
-*.gpkg
-**/*.gpkg
-*lithos_all_ne_slope_units_final*
+# NOTE: *.gpkg files are now tracked via Git LFS (not ignored)
+
 *.SAFE
 **/*.SAFE
 *.SAFE.zip
