@@ -347,11 +347,6 @@ const Home = ({ setAlertCount }) => {
           </div>
         </div>
       )}
-
-      {/* Alert Bar */}
-      <div className="absolute bottom-0 left-0 right-0 h-10 bg-nav/95 border-t border-white/10 backdrop-blur-md z-30 transition-transform group-hover:translate-y-0 translate-y-full hover:translate-y-0">
-        <AlertBanner alert={activeAlert} />
-      </div>
       </div>{/* end map-content wrapper */}
     </div>
   );

@@ -79,8 +79,8 @@ const REGIONAL_LANDMARKS = {
   ]
 };
 
-// ── Demo Presets for Academic / Evaluation Presentation ───────────────────────
-const DEMO_PRESETS = [
+// ── Strategic Himalayan & Mountain Pass Lifeline Corridors ────────────────────
+const STRATEGIC_MOUNTAIN_PASSES = [
   {
     id: 'sikkim-nh310',
     name: 'Sikkim NH-310: Gangtok ➔ Nathu La Pass',
@@ -115,6 +115,8 @@ const DEMO_PRESETS = [
     endLabel: 'Kohima Highway Post',
   },
 ];
+const DEMO_PRESETS = STRATEGIC_MOUNTAIN_PASSES;
+
 
 // Helper: Calculate forward heading in degrees (0..360, North=0)
 const calculateBearing = (lat1, lon1, lat2, lon2) => {
@@ -188,12 +190,16 @@ const SafeRoute = () => {
   const [showEvacuation, setShowEvacuation] = useState(false);
   const sessionId = useRef(`lithos_${Math.random().toString(36).slice(2)}`);
 
-  // ── Driving Simulation State ──
+  // ── Navigation & GPS Tracking State ──
+  const [navMode, setNavMode] = useState('live'); // 'live' (Real GPS) | 'preview' (Simulation)
+  const [isLocating, setIsLocating] = useState(false);
+  const [gpsAccuracy, setGpsAccuracy] = useState(null);
   const [demoSpeed, setDemoSpeed] = useState(3); // 1x, 3x, 8x
   const [isDemoPlaying, setIsDemoPlaying] = useState(true);
   const [demoMuted, setDemoMuted] = useState(false);
   const [show2DToolsDrawer, setShow2DToolsDrawer] = useState(false);
   const demoTimerRef = useRef(null);
+  const watchIdRef = useRef(null);
   const wakeLockRef = useRef(null);
 
   // Derive the active route (selected by user: Safe, Moderate, or Danger)
@@ -224,6 +230,133 @@ const SafeRoute = () => {
       window.speechSynthesis.speak(utterance);
     } catch (_) {}
   };
+
+  // ── Geolocation "Use My Current Location" Handler ──
+  const handleUseCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      alert("GPS Geolocation is not supported by your browser/device.");
+      return;
+    }
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setIsLocating(false);
+        const pt = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setStart(pt);
+        setStartQuery("My Current Location");
+        setFocusPoint(pt);
+        setGpsAccuracy(Math.round(pos.coords.accuracy || 10));
+        speak("Current location acquired via GPS.");
+      },
+      (err) => {
+        setIsLocating(false);
+        console.warn("GPS error:", err);
+        alert("Could not acquire GPS position: " + err.message + ". Check device location permissions.");
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 10000 }
+    );
+  };
+
+  // ── Live Real-Time GPS Navigation Engine ──
+  const startLiveGpsNavigation = () => {
+    setNavMode('live');
+    setIsNavigating(true);
+    setIsDrivingMode(true);
+    requestWakeLock();
+    speak(`Starting live GPS turn-by-turn navigation along ${activeRoute?.title || 'route'}`);
+
+    // Set initial car position to first segment
+    const seg0 = activeRoute?.segments?.[0];
+    if (seg0) {
+      setCarPosition({
+        lat: seg0.lat,
+        lng: seg0.lon ?? seg0.lng,
+        risk: seg0.risk_level || 'GREEN',
+        slope: seg0.slope_mean ?? 14,
+        fos: seg0.fos_seismic ?? 1.5,
+        heading: 0,
+        realGpsSpeed: null
+      });
+    }
+
+    if (navigator.geolocation) {
+      if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = navigator.geolocation.watchPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          const speedKmh = pos.coords.speed != null && pos.coords.speed >= 0 ? Math.round(pos.coords.speed * 3.6) : null;
+          const heading = pos.coords.heading != null && !isNaN(pos.coords.heading) ? Math.round(pos.coords.heading) : null;
+          setGpsAccuracy(Math.round(pos.coords.accuracy || 5));
+
+          if (activeRoute?.segments?.length) {
+            let bestIdx = 0;
+            let minDist = Infinity;
+            activeRoute.segments.forEach((seg, idx) => {
+              const d = L.latLng(lat, lng).distanceTo(L.latLng(seg.lat, seg.lon ?? seg.lng));
+              if (d < minDist) {
+                minDist = d;
+                bestIdx = idx;
+              }
+            });
+
+            setNavIndex(bestIdx);
+            const curr = activeRoute.segments[bestIdx];
+            const isDeviated = minDist > 120;
+            setIsOffRoute(isDeviated);
+
+            setCarPosition({
+              lat,
+              lng,
+              risk: curr?.risk_level || 'GREEN',
+              slope: curr?.slope_mean ?? 14,
+              fos: curr?.fos_seismic ?? 1.5,
+              heading: heading != null ? heading : 0,
+              realGpsSpeed: speedKmh
+            });
+          }
+        },
+        (err) => console.warn("GPS tracking error:", err),
+        { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 }
+      );
+    }
+  };
+
+  // ── Route Preview Simulation Engine ──
+  const startPreviewSimulation = () => {
+    setNavMode('preview');
+    setIsNavigating(true);
+    setIsDrivingMode(true);
+    setIsDemoPlaying(true);
+    setNavIndex(0);
+    const seg0 = activeRoute?.segments?.[0];
+    if (seg0) {
+      setCarPosition({
+        lat: seg0.lat,
+        lng: seg0.lon ?? seg0.lng,
+        risk: seg0.risk_level || 'GREEN',
+        slope: seg0.slope_mean ?? 14,
+        fos: seg0.fos_seismic ?? 1.5,
+        heading: 0,
+        realGpsSpeed: null
+      });
+    }
+    speak(`Previewing drive along ${activeRoute?.title || 'route'}`);
+    requestWakeLock();
+  };
+
+  // ── Stop / Exit Navigation ──
+  const stopNavigation = () => {
+    setIsNavigating(false);
+    setIsDrivingMode(false);
+    if (watchIdRef.current) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    clearInterval(demoTimerRef.current);
+    releaseWakeLock();
+  };
+
 
   useEffect(() => {
     fetchRegions();
@@ -439,11 +572,11 @@ const SafeRoute = () => {
     }
   };
 
-  // ── Driving Simulation Movement Engine ─────────────────────────────────────
+  // ── Driving Route Preview Simulation Engine ────────────────────────────────
   useEffect(() => {
     clearInterval(demoTimerRef.current);
 
-    if (isNavigating && isDemoPlaying && activeRoute?.segments?.length) {
+    if (isNavigating && navMode === 'preview' && isDemoPlaying && activeRoute?.segments?.length) {
       const segments = activeRoute.segments;
       // 1x = ~500ms per waypoint (realistic mountain pace)
       // 3x = ~160ms per waypoint
@@ -479,7 +612,8 @@ const SafeRoute = () => {
             risk: curr.risk_level || 'GREEN',
             slope: curr.slope_mean ?? 14.2,
             fos: curr.fos_seismic ?? 1.55,
-            heading: Math.round(heading)
+            heading: Math.round(heading),
+            realGpsSpeed: null
           });
 
           return nextIdx;
@@ -488,7 +622,7 @@ const SafeRoute = () => {
     }
 
     return () => clearInterval(demoTimerRef.current);
-  }, [isNavigating, isDemoPlaying, demoSpeed, activeRoute, demoMuted]);
+  }, [isNavigating, navMode, isDemoPlaying, demoSpeed, activeRoute, demoMuted]);
 
   // Voice announcements for risk zones
   useEffect(() => {
@@ -675,7 +809,7 @@ const SafeRoute = () => {
                     value={startQuery}
                     onChange={e => setStartQuery(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && searchLocation(startQuery, setStart, setStartQuery)}
-                    placeholder="Your location (e.g. Gangtok, MG Marg)..."
+                    placeholder="Your location (or click GPS icon)..."
                     className="w-full bg-transparent outline-none text-xs text-white placeholder-slate-500 font-medium"
                   />
                   {start && (
@@ -683,7 +817,16 @@ const SafeRoute = () => {
                       <X className="w-3.5 h-3.5" />
                     </button>
                   )}
-                  <button onClick={() => searchLocation(startQuery, setStart, setStartQuery)} className="text-slate-400 hover:text-[#2B9EFF]">
+                  <button
+                    type="button"
+                    onClick={handleUseCurrentLocation}
+                    disabled={isLocating}
+                    className="text-slate-400 hover:text-cyan-400 p-0.5 transition-colors cursor-pointer shrink-0"
+                    title="Use My Current GPS Location"
+                  >
+                    {isLocating ? <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-400" /> : <Navigation className="w-3.5 h-3.5 text-cyan-400" />}
+                  </button>
+                  <button onClick={() => searchLocation(startQuery, setStart, setStartQuery)} className="text-slate-400 hover:text-[#2B9EFF] shrink-0">
                     <Search className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -852,32 +995,21 @@ const SafeRoute = () => {
                 })}
               </div>
 
-              {/* Clean Google Maps Style Start Navigation Button */}
-              <div className="pt-2">
+              {/* Dual Clean Navigation Buttons */}
+              <div className="pt-2 space-y-2">
                 <button
-                  onClick={() => {
-                    setIsNavigating(true);
-                    setIsDrivingMode(true);
-                    setIsDemoPlaying(true);
-                    setNavIndex(0);
-                    const seg0 = activeRoute?.segments?.[0];
-                    if (seg0) {
-                      setCarPosition({
-                        lat: seg0.lat,
-                        lng: seg0.lon ?? seg0.lng,
-                        risk: seg0.risk_level || 'GREEN',
-                        slope: seg0.slope_mean ?? 14,
-                        fos: seg0.fos_seismic ?? 1.5,
-                        heading: 0
-                      });
-                    }
-                    speak(`Starting navigation along ${activeRoute.title}`);
-                    requestWakeLock();
-                  }}
-                  className="w-full py-2.5 rounded-full font-bold text-xs tracking-wider transition-all flex items-center justify-center gap-2 bg-[#2B9EFF] hover:bg-[#2087de] text-white shadow-md active:scale-[0.99] cursor-pointer uppercase"
+                  onClick={startLiveGpsNavigation}
+                  className="w-full py-2.5 rounded-xl font-bold text-xs tracking-wider transition-all flex items-center justify-center gap-2 bg-[#2B9EFF] hover:bg-[#2087de] text-white shadow-lg active:scale-[0.99] cursor-pointer uppercase"
                 >
-                  <Navigation className="w-3.5 h-3.5 fill-white text-white" />
-                  <span>Start Navigation ({mapStyle === '3d' ? '3D' : '2D'})</span>
+                  <Navigation className="w-3.5 h-3.5 fill-white text-white animate-pulse" />
+                  <span>Start Live GPS Navigation ({mapStyle === '3d' ? '3D' : '2D'})</span>
+                </button>
+                <button
+                  onClick={startPreviewSimulation}
+                  className="w-full py-2 rounded-xl font-semibold text-xs tracking-wide transition-all flex items-center justify-center gap-2 bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 hover:text-white border border-white/10 active:scale-[0.99] cursor-pointer"
+                >
+                  <Play className="w-3 h-3 text-emerald-400 fill-emerald-400" />
+                  <span>Preview Route Drive (Simulation)</span>
                 </button>
               </div>
             </div>
@@ -1135,11 +1267,7 @@ const SafeRoute = () => {
 
                 {/* Exit Drive Button */}
                 <button
-                  onClick={() => {
-                    setIsNavigating(false);
-                    setIsDrivingMode(false);
-                    releaseWakeLock();
-                  }}
+                  onClick={stopNavigation}
                   className="p-2 rounded-full bg-black/30 hover:bg-black/50 text-white/80 hover:text-white transition-colors shrink-0 cursor-pointer"
                   title="Exit Navigation"
                 >
@@ -1147,6 +1275,27 @@ const SafeRoute = () => {
                 </button>
               </div>
             </div>
+
+            {/* Off-Route Alert Banner */}
+            {isOffRoute && (
+              <div className="w-full max-w-md mx-auto pointer-events-auto">
+                <div className="bg-amber-950/95 border border-amber-500/80 rounded-xl p-2.5 shadow-xl backdrop-blur-xl flex items-center justify-between gap-2.5 animate-pulse">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-amber-300">Vehicle Off Planned Path</p>
+                      <p className="text-xs text-white">Deviated by &gt; 120m from safe corridor.</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={calculateRoute}
+                    className="px-3 py-1 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-[10px] uppercase shrink-0 cursor-pointer shadow"
+                  >
+                    Recalculate
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Landslide Hazard Subtle Banner if entering Red zone */}
             {currSeg?.risk_level === 'RED' && (
@@ -1165,9 +1314,19 @@ const SafeRoute = () => {
             <div className="w-full max-w-xl mx-auto pointer-events-auto animate-in slide-in-from-bottom duration-300">
               <div className="bg-[#090d1c]/95 border border-slate-800 rounded-2xl p-4 shadow-2xl backdrop-blur-xl flex flex-col gap-3">
 
-                {/* Top Row: Google Maps ETA & Car Telemetry */}
+                {/* Top Row: Mode Badge, Google Maps ETA & Car Telemetry */}
                 <div className="flex items-center justify-between gap-3 border-b border-slate-800/80 pb-2.5">
                   <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-[9px] font-mono font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
+                        navMode === 'live' ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 animate-pulse' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                      }`}>
+                        {navMode === 'live' ? '🛰️ LIVE GPS DRIVE' : '▶️ ROUTE PREVIEW'}
+                      </span>
+                      {navMode === 'live' && gpsAccuracy && (
+                        <span className="text-[9px] font-mono text-slate-400">±{gpsAccuracy}m</span>
+                      )}
+                    </div>
                     <div className="text-2xl font-bold text-emerald-400 font-mono">
                       {formatDuration(remainingMin)}
                     </div>
@@ -1180,7 +1339,11 @@ const SafeRoute = () => {
                     {/* Speedometer */}
                     <div className="text-right">
                       <span className="text-[9px] uppercase tracking-wider text-slate-500 font-medium block">Speed</span>
-                      <span className="text-sm font-bold text-white font-mono">{dynamicSpeedKmh} <span className="text-[10px] text-slate-400 font-normal">km/h</span></span>
+                      <span className="text-sm font-bold text-white font-mono">
+                        {navMode === 'live'
+                          ? (carPosition?.realGpsSpeed != null ? carPosition.realGpsSpeed : '0')
+                          : dynamicSpeedKmh} <span className="text-[10px] text-slate-400 font-normal">km/h</span>
+                      </span>
                     </div>
 
                     {/* Slope Grade */}
@@ -1216,28 +1379,38 @@ const SafeRoute = () => {
                 {/* Bottom Row: Controls */}
                 <div className="flex items-center justify-between pt-0.5">
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setIsDemoPlaying(!isDemoPlaying)}
-                      className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-medium text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-                    >
-                      {isDemoPlaying ? <><Pause className="w-3.5 h-3.5" /> Pause</> : <><Play className="w-3.5 h-3.5" /> Resume</>}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setNavIndex(0);
-                        const s0 = activeRoute?.segments?.[0];
-                        if (s0) setCarPosition({ lat: s0.lat, lng: s0.lon ?? s0.lng, risk: s0.risk_level || 'GREEN', slope: s0.slope_mean ?? 14, fos: s0.fos_seismic ?? 1.5, heading: 0 });
-                        setIsDemoPlaying(true);
-                      }}
-                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer"
-                      title="Restart"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                    </button>
+                    {navMode === 'preview' ? (
+                      <>
+                        <button
+                          onClick={() => setIsDemoPlaying(!isDemoPlaying)}
+                          className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-medium text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          {isDemoPlaying ? <><Pause className="w-3.5 h-3.5" /> Pause</> : <><Play className="w-3.5 h-3.5" /> Resume</>}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setNavIndex(0);
+                            const s0 = activeRoute?.segments?.[0];
+                            if (s0) setCarPosition({ lat: s0.lat, lng: s0.lon ?? s0.lng, risk: s0.risk_level || 'GREEN', slope: s0.slope_mean ?? 14, fos: s0.fos_seismic ?? 1.5, heading: 0, realGpsSpeed: null });
+                            setIsDemoPlaying(true);
+                          }}
+                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                          title="Restart preview"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                        </button>
+                      </>
+                    ) : (
+                      <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-[11px] font-mono">
+                        <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                        <span>Tracking Device GPS</span>
+                      </div>
+                    )}
+
                     <button
                       onClick={() => setDemoMuted(!demoMuted)}
                       className={`p-1.5 rounded-lg transition-colors cursor-pointer ${demoMuted ? 'text-slate-500 hover:text-slate-300' : 'text-[#2B9EFF] hover:text-[#2B9EFF]'}`}
-                      title={demoMuted ? "Unmute Voice" : "Mute Voice"}
+                      title={demoMuted ? "Unmute Voice Guidance" : "Mute Voice Guidance"}
                     >
                       {demoMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
                     </button>
@@ -1259,18 +1432,20 @@ const SafeRoute = () => {
                     </button>
                   </div>
 
-                  {/* Speed Multiplier */}
-                  <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg p-0.5">
-                    {[1, 3, 8].map(s => (
-                      <button
-                        key={s}
-                        onClick={() => setDemoSpeed(s)}
-                        className={`px-2 py-0.5 text-[10px] font-semibold rounded transition-colors ${demoSpeed === s ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
-                      >
-                        {s}x
-                      </button>
-                    ))}
-                  </div>
+                  {/* Speed Multiplier for preview */}
+                  {navMode === 'preview' && (
+                    <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg p-0.5">
+                      {[1, 3, 8].map(s => (
+                        <button
+                          key={s}
+                          onClick={() => setDemoSpeed(s)}
+                          className={`px-2 py-0.5 text-[10px] font-semibold rounded transition-colors ${demoSpeed === s ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
+                        >
+                          {s}x
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
               </div>

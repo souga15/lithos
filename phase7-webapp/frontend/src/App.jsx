@@ -14,7 +14,8 @@ const Reports     = React.lazy(() => import('./pages/Reports'));
 const Regions     = React.lazy(() => import('./pages/Regions'));
 const About       = React.lazy(() => import('./pages/About'));
 const EngineerPortal = React.lazy(() => import('./pages/EngineerPortal'));
-const OfflineBanner = React.lazy(() => import('./components/OfflineBanner'));
+const AlertBanner   = React.lazy(() => import('./components/AlertBanner'));
+
 const InstallPrompt = React.lazy(() => import('./components/InstallPrompt'));
 const PrivacyPolicy = React.lazy(() => import('./pages/PrivacyPolicy'));
 const PrivacyConsent= React.lazy(() => import('./components/PrivacyConsent'));

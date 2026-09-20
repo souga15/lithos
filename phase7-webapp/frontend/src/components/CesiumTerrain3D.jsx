@@ -1397,14 +1397,14 @@ const CesiumTerrain3D = ({
               )}
             </div>
 
-            {/* Section: Evaluation & Demo Corridors (4x / 10x Speed) */}
+            {/* Section: Strategic Corridors (4x / 10x Speed) */}
             {demoPresets && demoPresets.length > 0 && (
               <div className="pt-2.5 border-t border-slate-800 space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-cyan-300">
-                      Demo Corridors
+                      Strategic Corridors
                     </span>
                   </div>
                   {onSetDemoSpeed && (
@@ -1453,7 +1453,7 @@ const CesiumTerrain3D = ({
                     className="w-full py-1.5 rounded-lg bg-gradient-to-r from-cyan-600 to-sky-600 hover:from-cyan-500 hover:to-sky-500 text-white text-[10px] font-bold flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.99] transition-all cursor-pointer"
                   >
                     <Play className="w-3 h-3 fill-white" />
-                    <span>Start Demo Run ({demoSpeed}x Speed)</span>
+                    <span>Preview Drive ({demoSpeed}x Speed)</span>
                   </button>
                 )}
               </div>

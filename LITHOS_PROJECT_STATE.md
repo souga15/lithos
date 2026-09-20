@@ -162,3 +162,12 @@ LITHOS/
 
 
 
+
+
+## September 21, 2026 - Security Hardening & Credentials Update
+- **Rate Limiting:** Added IP-based rate limiting (10 req/min) to all POST endpoints in backend/main.py.
+- **Environment Variables:** Migrated hardcoded credentials (admin key, engineer emails) to use os.getenv in backend/engineer_service.py and backend/main.py. Require a .env file.
+- **XML Sanitization:** Added xml.sax.saxutils.escape to CAP XML payload generation to prevent XML injection attacks.
+- **Credential Security:** Re-generated Google Earth Engine Service Account Keys (gee_credentials.json).
+- **Git Ignore Updates:** Added gee_credentials.json, sos_log.json, and dispatched_alerts.json to root .gitignore to prevent scraping.
+- **UI Updates:** Removed non-essential phone mockups from Alerts.jsx and converted rigid dropdowns into free-text inputs for regional hazard zones.
