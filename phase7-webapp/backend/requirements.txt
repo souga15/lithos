@@ -1,25 +1,27 @@
+# Core API
 fastapi
-uvicorn
+uvicorn[standard]
 websockets
 requests
-numpy
-pandas
 python-multipart
 pydantic
-geopandas
-pyogrio
-fiona
-rtree
-shapely
-earthengine-api
-xgboost
-scikit-learn
-matplotlib
-jinja2
-python-jose[cryptography]
-passlib[bcrypt]
 python-dotenv
 aiohttp
+jinja2
+
+# Data / Science (lightweight)
+numpy
+pandas
 scipy
-rasterio
-torch
+scikit-learn
+xgboost
+shapely
+Pillow
+
+# Auth
+python-jose[cryptography]
+passlib[bcrypt]
+
+# NOTE: torch, rasterio, geopandas, fiona, pyogrio, earthengine-api
+# are excluded from deployment — they exceed Render free-tier RAM (512MB).
+# The app falls back to physics-based calculations automatically.

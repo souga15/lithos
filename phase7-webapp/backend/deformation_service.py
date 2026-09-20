@@ -3,9 +3,15 @@
 import numpy as np
 import os
 import json
-import rasterio
-from rasterio.windows import from_bounds
+try:
+    import rasterio
+    from rasterio.windows import from_bounds
+    _HAS_RASTERIO = True
+except ImportError:
+    rasterio = None
+    _HAS_RASTERIO = False
 import warnings
+
 
 class DeformationService:
     def __init__(self):
