@@ -1,7 +1,13 @@
-import ee
+try:
+    import ee
+    _HAS_EE = True
+except ImportError:
+    ee = None
+    _HAS_EE = False
 import os
 import json
 from datetime import datetime, timedelta
+
 
 # Config paths
 CREDENTIAL_FILE = os.path.join(os.path.dirname(__file__), "gee_credentials.json")

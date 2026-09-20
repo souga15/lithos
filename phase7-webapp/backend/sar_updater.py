@@ -3,7 +3,14 @@ import requests
 import shutil
 import time
 from datetime import datetime, timedelta
-from gee_service import gee_service, ee
+try:
+    from gee_service import gee_service, ee
+    _HAS_GEE = True
+except Exception:
+    gee_service = None
+    ee = None
+    _HAS_GEE = False
+
 import mock_data
 from deformation_service import deformation_service
 
@@ -90,6 +97,9 @@ def run_global_update():
 
 async def run_updater_loop():
     """Persistent background task for FastAPI lifespan."""
+    if not _HAS_GEE:
+        print("[SAR Updater] GEE not available — satellite sync disabled.")
+        return
     print("[SAR Updater] Background satellite sync loop started.")
     import asyncio
     await asyncio.sleep(10)
