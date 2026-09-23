@@ -69,39 +69,7 @@ function LoadingFallback({ message = "Initialising Systems", progress = null }) 
 }
 
 function AppInitializer({ children }) {
-  const [isReady, setIsReady] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [statusMsg, setStatusMsg] = useState("Checking Offline Cache...");
-
-  useEffect(() => {
-    async function initData() {
-      // We only pre-fetch the primary region (cherrapunji) to get the app started fast
-      const mainRegion = 'cherrapunji';
-      
-      const cached = await isRegionCached(mainRegion);
-      if (cached) {
-        setIsReady(true);
-        return;
-      }
-
-      setStatusMsg("Downloading Offline Terrain Models...");
-      
-      // Perform the download and update progress
-      await downloadAndCacheRegion(mainRegion, (p) => {
-        setProgress(p);
-      });
-
-      // Done
-      setIsReady(true);
-    }
-    
-    initData();
-  }, []);
-
-  if (!isReady) {
-    return <LoadingFallback message={statusMsg} progress={progress > 0 ? progress : null} />;
-  }
-
+  // Pass-through instantly. Offline download is now deferred to the RegionScanner in Home.jsx.
   return children;
 }
 

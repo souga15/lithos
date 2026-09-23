@@ -183,27 +183,9 @@ const Home = ({ setAlertCount }) => {
 
   return (
     <div className="absolute inset-0 group">
-      {/* Downloading Overlay for new regions */}
-      {downloadProgress !== null && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-bg/60">
-          <div className="glass px-8 py-6 rounded-2xl flex flex-col items-center gap-4 shadow-2xl">
-            <div className="text-accent font-black tracking-widest text-sm animate-pulse">
-              DOWNLOADING REGION DATA
-            </div>
-            <div className="w-48 bg-white/10 h-1.5 rounded-full overflow-hidden">
-              <div 
-                className="bg-accent h-full transition-all duration-300"
-                style={{ width: `${downloadProgress}%` }}
-              />
-            </div>
-            <div className="text-[10px] text-white/50 font-mono">{downloadProgress}%</div>
-          </div>
-        </div>
-      )}
-
       {/* Scanner overlay — plays on top of map during initial load */}
       {showScanner && (
-        <RegionScanner region={selectedRegion} onDone={handleScanDone} />
+        <RegionScanner region={selectedRegion} onDone={handleScanDone} downloadProgress={downloadProgress} />
       )}
 
       {/* Map Background — loads under scanner, revealed when scanner ends */}

@@ -15,12 +15,17 @@ import React, { useEffect, useRef, useState } from 'react';
 
 const SCAN_DURATION = 3800; // total ms before onDone fires
 
-const RegionScanner = ({ region, onDone }) => {
+const RegionScanner = ({ region, onDone, downloadProgress }) => {
   const canvasRef  = useRef(null);
   const rafRef     = useRef(null);
   const startRef   = useRef(null);
+  const downloadRef = useRef(downloadProgress);
   const [phase, setPhase]   = useState(0); // 0=active 1=fading 2=done
   const [readouts, setReadouts] = useState([]);
+
+  useEffect(() => {
+    downloadRef.current = downloadProgress;
+  }, [downloadProgress]);
 
   // ── Canvas animation loop ──────────────────────────────────────────────────
   useEffect(() => {
@@ -212,13 +217,14 @@ const RegionScanner = ({ region, onDone }) => {
       }
 
       // ── Phase G: fade-out veil (3200→3800ms) ──────────────────────────────
-      if (ms > 3200) {
+      const isDownloading = downloadRef.current !== null;
+      if (ms > 3200 && !isDownloading) {
         const fadeAlpha = Math.min(1, (ms - 3200) / 600);
         ctx.fillStyle   = `rgba(0,0,0,${fadeAlpha})`;
         ctx.fillRect(0, 0, W(), H());
       }
 
-      if (ms < SCAN_DURATION) {
+      if (ms < SCAN_DURATION || isDownloading) {
         rafRef.current = requestAnimationFrame(drawFrame);
       } else {
         setPhase(2);
@@ -324,6 +330,28 @@ const RegionScanner = ({ region, onDone }) => {
             Scanning terrain...
           </span>
         </div>
+
+        {downloadProgress !== null && (
+          <div style={{ marginTop: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+            <div style={{ fontSize: '10px', color: '#00C2FF', fontWeight: 900, letterSpacing: '0.2em', textTransform: 'uppercase' }}>
+              DOWNLOADING REGION DATA
+            </div>
+            <div style={{ width: '250px', background: 'rgba(255,255,255,0.1)', height: '6px', borderRadius: '4px', overflow: 'hidden' }}>
+              <div 
+                style={{
+                  background: '#00C2FF',
+                  height: '100%',
+                  transition: 'width 0.3s ease',
+                  width: `${downloadProgress}%`,
+                  boxShadow: '0 0 10px #00C2FF'
+                }}
+              />
+            </div>
+            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)', fontFamily: 'monospace' }}>
+              {downloadProgress}%
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
