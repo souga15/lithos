@@ -13,6 +13,7 @@ import { useLocation } from 'react-router-dom';
 import API_BASE_URL from '../apiConfig';
 
 import Terrain3DHeatmap from '../components/Terrain3DHeatmap';
+import { getCachedRegion } from '../utils/offlineStorage';
 
 const CesiumTerrain3DLazy = React.lazy(() =>
   import('../components/CesiumTerrain3D').catch((err) => {
@@ -45,6 +46,7 @@ const Home = ({ setAlertCount }) => {
     grid: true,
     reports: true
   });
+  const [downloadProgress, setDownloadProgress] = useState(null);
 
   useEffect(() => {
     fetchRegions();
@@ -97,9 +99,28 @@ const Home = ({ setAlertCount }) => {
 
   const fetchRiskGrid = async (key) => {
     try {
-      const resp = await axios.get(`${API_BASE_URL}/api/risk-grid?region=${key}`);
-      setRiskGrid(resp.data);
-    } catch (err) { console.error(err); }
+      // 1. Check Offline Cache First (Instant Load)
+      const cached = await getCachedRegion(key);
+      if (cached) {
+        setRiskGrid(cached);
+        return;
+      }
+      
+      // 2. Download and Cache with Progress Bar
+      setDownloadProgress(1); // Start progress UI
+      const success = await downloadAndCacheRegion(key, (p) => {
+        setDownloadProgress(p);
+      });
+      
+      if (success) {
+        const newlyCached = await getCachedRegion(key);
+        setRiskGrid(newlyCached);
+      }
+      setDownloadProgress(null);
+    } catch (err) { 
+      console.error(err); 
+      setDownloadProgress(null);
+    }
   };
 
   const fetchWeather = async (key) => {
@@ -162,6 +183,24 @@ const Home = ({ setAlertCount }) => {
 
   return (
     <div className="absolute inset-0 group">
+      {/* Downloading Overlay for new regions */}
+      {downloadProgress !== null && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center backdrop-blur-sm bg-bg/60">
+          <div className="glass px-8 py-6 rounded-2xl flex flex-col items-center gap-4 shadow-2xl">
+            <div className="text-accent font-black tracking-widest text-sm animate-pulse">
+              DOWNLOADING REGION DATA
+            </div>
+            <div className="w-48 bg-white/10 h-1.5 rounded-full overflow-hidden">
+              <div 
+                className="bg-accent h-full transition-all duration-300"
+                style={{ width: `${downloadProgress}%` }}
+              />
+            </div>
+            <div className="text-[10px] text-white/50 font-mono">{downloadProgress}%</div>
+          </div>
+        </div>
+      )}
+
       {/* Scanner overlay — plays on top of map during initial load */}
       {showScanner && (
         <RegionScanner region={selectedRegion} onDone={handleScanDone} />

@@ -24,7 +24,9 @@ const AdminPortal   = React.lazy(() => import('./pages/AdminPortal'));
 const HeatmapView   = React.lazy(() => import('./pages/HeatmapView'));
 
 
-function LoadingFallback() {
+import { isRegionCached, downloadAndCacheRegion, CACHE_KEYS } from './utils/offlineStorage';
+
+function LoadingFallback({ message = "Initialising Systems", progress = null }) {
   return (
     <div className="min-h-screen bg-bg flex flex-col items-center justify-center gap-8">
       {/* Wordmark */}
@@ -36,17 +38,71 @@ function LoadingFallback() {
           LITHOS
         </div>
         <div className="data-mono text-[10px] text-white/25 uppercase tracking-[0.45em]">
-          Initialising Systems
+          {message}
         </div>
       </div>
-      {/* Skeleton progress bar */}
+      
+      {/* Skeleton / Real Progress bar */}
       <div className="w-64 flex flex-col gap-2">
-        <div className="h-px w-full skeleton rounded" />
-        <div className="h-px w-3/4 skeleton rounded opacity-60" />
-        <div className="h-px w-1/2 skeleton rounded opacity-30" />
+        {progress !== null ? (
+          <>
+            <div className="w-full bg-white/5 h-1 rounded overflow-hidden">
+              <div 
+                className="bg-accent h-full transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <div className="text-center text-[10px] text-accent/70 font-mono mt-1">
+              {progress}%
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="h-px w-full skeleton rounded" />
+            <div className="h-px w-3/4 skeleton rounded opacity-60" />
+            <div className="h-px w-1/2 skeleton rounded opacity-30" />
+          </>
+        )}
       </div>
     </div>
   );
+}
+
+function AppInitializer({ children }) {
+  const [isReady, setIsReady] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [statusMsg, setStatusMsg] = useState("Checking Offline Cache...");
+
+  useEffect(() => {
+    async function initData() {
+      // We only pre-fetch the primary region (cherrapunji) to get the app started fast
+      const mainRegion = 'cherrapunji';
+      
+      const cached = await isRegionCached(mainRegion);
+      if (cached) {
+        setIsReady(true);
+        return;
+      }
+
+      setStatusMsg("Downloading Offline Terrain Models...");
+      
+      // Perform the download and update progress
+      await downloadAndCacheRegion(mainRegion, (p) => {
+        setProgress(p);
+      });
+
+      // Done
+      setIsReady(true);
+    }
+    
+    initData();
+  }, []);
+
+  if (!isReady) {
+    return <LoadingFallback message={statusMsg} progress={progress > 0 ? progress : null} />;
+  }
+
+  return children;
 }
 
 class ErrorBoundary extends React.Component {
@@ -106,13 +162,14 @@ function App() {
   }, []);
 
   return (
-    <Router>
-      <ErrorBoundary name="App Shell">
-        <Suspense fallback={<LoadingFallback />}>
-          <div className="min-h-screen flex flex-col bg-bg text-white noise-overlay">
-            <ErrorBoundary name="Navbar">
-              <Navbar alertCount={alertCount} isOffline={isOffline} />
-            </ErrorBoundary>
+    <AppInitializer>
+      <Router>
+        <ErrorBoundary name="App Shell">
+          <Suspense fallback={<LoadingFallback />}>
+            <div className="min-h-screen flex flex-col bg-bg text-white noise-overlay">
+              <ErrorBoundary name="Navbar">
+                <Navbar alertCount={alertCount} isOffline={isOffline} />
+              </ErrorBoundary>
 
             {isOffline && (
               <ErrorBoundary name="OfflineBanner">
@@ -199,7 +256,8 @@ function App() {
           </div>
         </Suspense>
       </ErrorBoundary>
-    </Router>
+      </Router>
+    </AppInitializer>
   );
 }
 

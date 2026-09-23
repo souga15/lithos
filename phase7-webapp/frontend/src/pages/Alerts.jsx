@@ -15,7 +15,7 @@ const Alerts = () => {
   const [loading, setLoading] = useState(true);
 
   // Email & Dispatch State
-  const [email, setEmail] = useState('sougatakarm29@gmail.com');
+  const [email, setEmail] = useState('');
   const [selectedRegion, setSelectedRegion] = useState('sikkim');
   const [customRegionsStr, setCustomRegionsStr] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -330,13 +330,6 @@ const Alerts = () => {
                   <label className="text-[10px] font-mono text-white/40 uppercase tracking-wider">
                     Recipient / Monitored Email Address
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => setEmail('sougatakarm29@gmail.com')}
-                    className="text-[9px] font-mono text-cyan-400 hover:text-cyan-300 transition-colors cursor-pointer"
-                  >
-                    Preset: sougatakarm29@gmail.com
-                  </button>
                 </div>
                 <div className="relative">
                   <Mail className="w-3.5 h-3.5 text-white/30 absolute left-3 top-1/2 -translate-y-1/2" />

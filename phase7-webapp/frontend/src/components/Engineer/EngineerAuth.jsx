@@ -62,6 +62,19 @@ const EngineerAuth = ({ onAuthenticated }) => {
           <p className="text-[10px] text-white/50 uppercase tracking-widest mt-1">Geotechnical Decision Support System</p>
         </div>
 
+        {/* Demo Credentials for SIH Evaluators */}
+        {authMode === 'login' && (
+          <div className="mb-6 bg-[#00C2FF]/10 border border-[#00C2FF]/30 rounded-xl p-3 text-center">
+            <p className="text-[10px] text-[#00C2FF] font-black uppercase tracking-widest mb-1">SIH Evaluator Demo Access</p>
+            <p className="text-[11px] font-mono text-white/80">
+              ID: <span className="text-white font-bold">engineer@lithos.gov</span>
+            </p>
+            <p className="text-[11px] font-mono text-white/80">
+              Pass: <span className="text-white font-bold">admin</span>
+            </p>
+          </div>
+        )}
+
         <form onSubmit={handleAuth} className="space-y-4">
           {authError && (
             <div className="bg-risk-red/10 border border-risk-red/30 text-risk-red text-xs p-3 rounded-lg text-center font-medium animate-pulse">
