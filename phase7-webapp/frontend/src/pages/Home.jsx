@@ -33,6 +33,7 @@ const Home = ({ setAlertCount }) => {
   const bypassIntro = location.state?.bypassIntro || false;
   const [showIntro, setShowIntro] = useState(!bypassIntro);
   const [showScanner, setShowScanner] = useState(bypassIntro);
+  const [showMeshLoader, setShowMeshLoader] = useState(bypassIntro);
   const [riskGrid, setRiskGrid] = useState(null);
   const [weather, setWeather] = useState(null);
   const [reports, setReports] = useState([]);
@@ -107,10 +108,13 @@ const Home = ({ setAlertCount }) => {
     setMapMode('3d-cesium');
     setShowIntro(false);
     setShowScanner(true); // trigger scan animation
+    setShowMeshLoader(true);
   };
 
   const handleScanDone = () => {
     setShowScanner(false);
+    // Keep mesh loader overlay for an extra 4 seconds to mask Cesium's black tile-loading phase
+    setTimeout(() => setShowMeshLoader(false), 4000);
   };
 
   const fetchRiskGrid = async (key) => {
@@ -202,6 +206,21 @@ const Home = ({ setAlertCount }) => {
       {/* Scanner overlay — plays on top of map during initial load */}
       {showScanner && (
         <RegionScanner region={selectedRegion} onDone={handleScanDone} downloadProgress={downloadProgress} />
+      )}
+
+      {/* Seamless transition overlay — masks Cesium tile loading blackout */}
+      {!showScanner && showMeshLoader && (
+        <div className="absolute inset-0 z-[8000] bg-black flex flex-col items-center justify-center animate-pulse">
+          <div style={{ fontSize: '10px', color: '#00C2FF', fontWeight: 900, letterSpacing: '0.2em', textTransform: 'uppercase' }}>
+            DEPLOYING 3D MESH...
+          </div>
+          <div style={{ width: '250px', background: 'rgba(255,255,255,0.1)', height: '6px', borderRadius: '4px', overflow: 'hidden', marginTop: '8px' }}>
+            <div style={{ background: '#00C2FF', height: '100%', width: '99%', boxShadow: '0 0 10px #00C2FF' }} />
+          </div>
+          <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)', fontFamily: 'monospace', marginTop: '8px' }}>
+            99%
+          </div>
+        </div>
       )}
 
       {/* Map Background — loads under scanner, revealed when scanner ends */}
