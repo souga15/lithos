@@ -96,10 +96,10 @@ const RegionScanner = ({ region, onDone, downloadProgress }) => {
 
       // (Horizontal scan line removed as requested)
 
-      // ── Phase D: radar sweep arc from centre (1000→3000ms) ────────────────
-      if (ms > 1000 && ms < 3200) {
-        const radarT  = (ms - 1000) / 2000;       // 0→1
-        const angle   = radarT * Math.PI * 3.5;   // 1.75 full rotations
+      // ── Phase D: radar sweep arc from centre (1000→14400ms) ────────────────
+      if (ms > 1000 && ms < 14400) {
+        const radarT  = (ms - 1000) / 13400;      // 0→1 over 13.4s
+        const angle   = radarT * Math.PI * 18;    // 9 full rotations
         const cx      = W() / 2;
         const cy      = H() / 2;
         const radius  = Math.sqrt(cx * cx + cy * cy) * 1.1;
@@ -155,10 +155,10 @@ const RegionScanner = ({ region, onDone, downloadProgress }) => {
         });
       }
 
-      // ── Phase E: cell scan flashes (scattered red/orange dots, 1500→3000ms)
-      if (ms > 1500 && ms < 3000) {
-        const flashT = (ms - 1500) / 1500;
-        const flashCount = Math.floor(flashT * 22);
+      // ── Phase E: cell scan flashes (scattered red/orange dots, 1500→14400ms)
+      if (ms > 1500 && ms < 14400) {
+        const flashT = (ms - 1500) / 12900;
+        const flashCount = Math.floor(flashT * 150);
         // Deterministic pseudo-random positions (seeded by index)
         for (let i = 0; i < flashCount; i++) {
           const px  = W() * ((i * 137.508 + 23) % W()) / W();
