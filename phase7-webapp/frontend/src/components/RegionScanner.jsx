@@ -227,13 +227,11 @@ const RegionScanner = ({ region, onDone, downloadProgress }) => {
       }
 
       if (progressBarRef.current && progressTextRef.current) {
-        let p = downloadRef.current;
-        if (p === null) {
-          // Fake progress from 0% to 100% over the 14.4 seconds of scan
-          p = Math.min(100, Math.floor((ms / 14400) * 100));
-        }
+        // Always use fake progress from 0% to 100% over the 14.4 seconds of scan
+        // This guarantees a smooth cinematic loading bar even if network download is instant
+        const p = Math.min(100, Math.floor((ms / 14400) * 100));
         progressBarRef.current.style.width = `${p}%`;
-        progressTextRef.current.innerText = `${p}%`;
+        progressTextRef.current.innerText = `${p === 100 ? '100% - DEPLOYING 3D MESH...' : p + '%'}`;
       }
 
       if (ms < SCAN_DURATION || isDownloading) {
