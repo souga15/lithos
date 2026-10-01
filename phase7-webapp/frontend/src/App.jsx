@@ -69,18 +69,7 @@ function LoadingFallback({ message = "Initialising Systems", progress = null }) 
 }
 
 function AppInitializer({ children }) {
-  useEffect(() => {
-    // Start background prefetch immediately when app loads
-    const mainRegion = 'cherrapunji';
-    isRegionCached(mainRegion).then(cached => {
-      if (!cached) {
-        // We don't await this, it just runs silently in the background
-        downloadAndCacheRegion(mainRegion).catch(console.error);
-      }
-    });
-  }, []);
-
-  // Pass-through instantly. Offline download is now deferred to the RegionScanner in Home.jsx.
+  // Pass-through instantly. Offline download is now deferred to Home.jsx for better UX.
   return children;
 }
 

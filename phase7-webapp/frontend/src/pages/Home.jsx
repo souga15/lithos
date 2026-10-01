@@ -13,7 +13,7 @@ import { useLocation } from 'react-router-dom';
 import API_BASE_URL from '../apiConfig';
 
 import Terrain3DHeatmap from '../components/Terrain3DHeatmap';
-import { getCachedRegion } from '../utils/offlineStorage';
+import { getCachedRegion, downloadAndCacheRegion, isRegionCached } from '../utils/offlineStorage';
 
 const CesiumTerrain3DLazy = React.lazy(() =>
   import('../components/CesiumTerrain3D').catch((err) => {
@@ -52,6 +52,22 @@ const Home = ({ setAlertCount }) => {
     fetchRegions();
     setupWebSocket();
   }, []);
+
+  // Delayed Background Pre-fetch: Wait 2.5s AFTER regions (buttons) are visible
+  useEffect(() => {
+    if (showIntro && regions.length > 0) {
+      const timer = setTimeout(() => {
+        const mainRegion = 'cherrapunji'; // Pre-fetch the heaviest/default region
+        isRegionCached(mainRegion).then(cached => {
+          if (!cached) {
+            console.log("[LITHOS] Starting delayed background pre-fetch...");
+            downloadAndCacheRegion(mainRegion).catch(console.error);
+          }
+        });
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [regions, showIntro]);
 
   useEffect(() => {
     if (selectedRegion) {

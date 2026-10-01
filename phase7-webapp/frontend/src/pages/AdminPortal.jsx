@@ -91,8 +91,11 @@ const AdminPortal = () => {
             <Shield className="w-7 h-7 text-accent" />
           </div>
           <h1 className="text-xl font-black tracking-widest uppercase mb-1">Admin Portal</h1>
-          <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest mb-8">
+          <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest mb-2">
             NDRF / BRO Officer Access
+          </p>
+          <p className="text-[9px] text-accent/60 italic mb-8">
+            (Evaluator PIN: 1157)
           </p>
           <input
             type="password"

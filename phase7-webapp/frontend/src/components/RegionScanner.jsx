@@ -13,7 +13,7 @@ import React, { useEffect, useRef, useState } from 'react';
  *   3600ms       : Everything fades out → cells revealed
  */
 
-const SCAN_DURATION = 3800; // total ms before onDone fires
+const SCAN_DURATION = 15000; // extended to 15 seconds to mask 3D map texture loading
 
 const RegionScanner = ({ region, onDone, downloadProgress }) => {
   const canvasRef  = useRef(null);
@@ -216,10 +216,10 @@ const RegionScanner = ({ region, onDone, downloadProgress }) => {
         ctx.globalAlpha = 1;
       }
 
-      // ── Phase G: fade-out veil (3200→3800ms) ──────────────────────────────
+      // ── Phase G: fade-out veil (14400→15000ms) ──────────────────────────────
       const isDownloading = downloadRef.current !== null;
-      if (ms > 3200 && !isDownloading) {
-        const fadeAlpha = Math.min(1, (ms - 3200) / 600);
+      if (ms > 14400 && !isDownloading) {
+        const fadeAlpha = Math.min(1, (ms - 14400) / 600);
         ctx.fillStyle   = `rgba(0,0,0,${fadeAlpha})`;
         ctx.fillRect(0, 0, W(), H());
       }
