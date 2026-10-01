@@ -20,6 +20,8 @@ const RegionScanner = ({ region, onDone, downloadProgress }) => {
   const rafRef     = useRef(null);
   const startRef   = useRef(null);
   const downloadRef = useRef(downloadProgress);
+  const progressBarRef = useRef(null);
+  const progressTextRef = useRef(null);
   const [phase, setPhase]   = useState(0); // 0=active 1=fading 2=done
   const [readouts, setReadouts] = useState([]);
 
@@ -224,6 +226,16 @@ const RegionScanner = ({ region, onDone, downloadProgress }) => {
         ctx.fillRect(0, 0, W(), H());
       }
 
+      if (progressBarRef.current && progressTextRef.current) {
+        let p = downloadRef.current;
+        if (p === null) {
+          // Fake progress from 0% to 100% over the 14.4 seconds of scan
+          p = Math.min(100, Math.floor((ms / 14400) * 100));
+        }
+        progressBarRef.current.style.width = `${p}%`;
+        progressTextRef.current.innerText = `${p}%`;
+      }
+
       if (ms < SCAN_DURATION || isDownloading) {
         rafRef.current = requestAnimationFrame(drawFrame);
       } else {
@@ -267,13 +279,13 @@ const RegionScanner = ({ region, onDone, downloadProgress }) => {
         transform: 'translate(-50%, -50%)',
         textAlign: 'center',
         pointerEvents: 'none',
-        animation: 'scanner-region-name 3.8s ease-out forwards',
+        animation: 'scanner-region-name 15s ease-out forwards',
       }}>
         <style>{`
           @keyframes scanner-region-name {
             0%   { opacity: 0; transform: translate(-50%,-50%) scale(1.15); }
-            20%  { opacity: 1; transform: translate(-50%,-50%) scale(1); }
-            75%  { opacity: 1; }
+            5%   { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+            95%  { opacity: 1; }
             100% { opacity: 0; transform: translate(-50%,-50%) scale(0.92); }
           }
           @keyframes scanner-sub-blink {
@@ -331,27 +343,25 @@ const RegionScanner = ({ region, onDone, downloadProgress }) => {
           </span>
         </div>
 
-        {downloadProgress !== null && (
-          <div style={{ marginTop: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-            <div style={{ fontSize: '10px', color: '#00C2FF', fontWeight: 900, letterSpacing: '0.2em', textTransform: 'uppercase' }}>
-              DOWNLOADING REGION DATA
-            </div>
-            <div style={{ width: '250px', background: 'rgba(255,255,255,0.1)', height: '6px', borderRadius: '4px', overflow: 'hidden' }}>
-              <div 
-                style={{
-                  background: '#00C2FF',
-                  height: '100%',
-                  transition: 'width 0.3s ease',
-                  width: `${downloadProgress}%`,
-                  boxShadow: '0 0 10px #00C2FF'
-                }}
-              />
-            </div>
-            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)', fontFamily: 'monospace' }}>
-              {downloadProgress}%
-            </div>
+        <div style={{ marginTop: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+          <div style={{ fontSize: '10px', color: '#00C2FF', fontWeight: 900, letterSpacing: '0.2em', textTransform: 'uppercase' }}>
+            PROCESSING TERRAIN DATA
           </div>
-        )}
+          <div style={{ width: '250px', background: 'rgba(255,255,255,0.1)', height: '6px', borderRadius: '4px', overflow: 'hidden' }}>
+            <div 
+              ref={progressBarRef}
+              style={{
+                background: '#00C2FF',
+                height: '100%',
+                width: '0%',
+                boxShadow: '0 0 10px #00C2FF'
+              }}
+            />
+          </div>
+          <div ref={progressTextRef} style={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)', fontFamily: 'monospace' }}>
+            0%
+          </div>
+        </div>
       </div>
     </div>
   );
